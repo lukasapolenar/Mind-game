@@ -6,7 +6,7 @@
     "node": "22.x"
   },
   "scripts": {
-    "build": "node scripts/build.js",
+    "build": "node -e \"const fs=require('node:fs');const c={supabaseUrl:process.env.SUPABASE_URL||'',supabaseAnonKey:process.env.SUPABASE_ANON_KEY||'',appUrl:process.env.PUBLIC_APP_URL||''};if(!fs.existsSync('outputs/index.html'))throw new Error('Chybi outputs/index.html');fs.writeFileSync('outputs/runtime-config.js','globalThis.__OKRAJOVKA_CONFIG__='+JSON.stringify(c)+';\\n')\"",
     "lint": "node scripts/lint.js",
     "test": "node tests/initialization.test.js && node tests/multiplayer.test.js",
     "start": "npx vercel dev",
