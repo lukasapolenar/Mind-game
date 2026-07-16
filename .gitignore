@@ -1,0 +1,11 @@
+node_modules/
+.pnpm-store/
+.agents/
+.codex/
+work/
+src/
+.env
+.env.local
+.vercel/
+playwright-report/
+test-results/
