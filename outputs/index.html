@@ -1,0 +1,3838 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Okrajovka — multiplayer desková hra</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #f8f4e8;
+      --muted: #aaa9b5;
+      --panel: rgba(21, 22, 31, .86);
+      --line: rgba(255,255,255,.12);
+      --accent: #e9ff70;
+      --cell: #242733;
+      --cell-alt: #292c39;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100svh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 15% 0%, rgba(114, 81, 255, .24), transparent 34rem),
+        radial-gradient(circle at 100% 85%, rgba(46, 196, 182, .17), transparent 34rem),
+        #0d0e13;
+    }
+    button, input, select { font: inherit; }
+    button { color: inherit; }
+    .screen { min-height: 100svh; }
+    .hidden { display: none !important; }
+
+    .lobby {
+      width: min(1120px, 100%);
+      margin: auto;
+      padding: clamp(20px, 5vw, 64px);
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(320px, .9fr);
+      gap: clamp(28px, 6vw, 80px);
+      align-items: center;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; color: var(--accent); font-weight: 850; letter-spacing: -.02em; }
+    .brand-mark { width: 32px; height: 32px; border-radius: 10px; background: var(--accent); color: #101113; display: grid; place-items: center; }
+    h1 { margin: 30px 0 18px; font-size: clamp(3.2rem, 8vw, 6.8rem); line-height: .86; letter-spacing: -.08em; max-width: 700px; }
+    .lead { max-width: 560px; color: var(--muted); font-size: clamp(1rem, 2vw, 1.25rem); line-height: 1.6; }
+    .feature-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 30px; }
+    .chip { border: 1px solid var(--line); border-radius: 999px; padding: 8px 12px; color: #d9d7df; font-size: .82rem; background: rgba(255,255,255,.04); }
+    .card {
+      padding: clamp(20px, 4vw, 34px);
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background: var(--panel);
+      box-shadow: 0 32px 80px rgba(0,0,0,.34);
+      backdrop-filter: blur(18px);
+    }
+    .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 5px; background: rgba(255,255,255,.055); border-radius: 14px; }
+    .tab { border: 0; background: transparent; border-radius: 10px; padding: 11px; color: var(--muted); cursor: pointer; }
+    .tab.active { background: #f3f0e7; color: #111218; font-weight: 800; }
+    .field { display: grid; gap: 8px; margin-top: 20px; }
+    label { color: var(--muted); font-size: .78rem; font-weight: 750; text-transform: uppercase; letter-spacing: .08em; }
+    input, select {
+      width: 100%; border: 1px solid var(--line); border-radius: 13px; padding: 13px 14px;
+      background: rgba(255,255,255,.055); color: var(--ink); outline: none;
+    }
+    input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(233,255,112,.1); }
+    option { color: #111; }
+    .room-strip { margin-top: 22px; padding: 15px; border: 1px dashed rgba(233,255,112,.36); border-radius: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .room-strip small { display: block; color: var(--muted); margin-bottom: 4px; }
+    .room-code { font-size: 1.35rem; font-weight: 900; letter-spacing: .14em; color: var(--accent); }
+    .icon-btn { border: 1px solid var(--line); background: rgba(255,255,255,.05); border-radius: 11px; padding: 9px 11px; cursor: pointer; }
+    .roster { display: grid; gap: 9px; margin: 20px 0; }
+    .player-line { display: flex; align-items: center; gap: 11px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.07); }
+    .dot { width: 11px; height: 11px; border-radius: 50%; background: var(--player); box-shadow: 0 0 16px var(--player); }
+    .player-line strong { flex: 1; font-size: .92rem; }
+    .role-select { width:auto; max-width:120px; padding:7px 8px; border-radius:9px; font-size:.75rem; }
+    .role-badge { padding:3px 7px; border-radius:999px; background:rgba(255,255,255,.08); color:var(--accent); font-size:.66rem; font-weight:900; }
+    .tag { color: var(--muted); font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; }
+    .primary {
+      width: 100%; border: 0; border-radius: 14px; padding: 15px 18px; cursor: pointer;
+      color: #101113; background: var(--accent); font-weight: 900;
+      box-shadow: 0 12px 30px rgba(233,255,112,.14); transition: transform .2s ease, opacity .2s ease;
+    }
+    .primary:hover { transform: translateY(-2px); }
+    .primary:disabled { opacity: .42; cursor: not-allowed; transform: none; }
+    .hint { margin: 12px 0 0; color: var(--muted); font-size: .76rem; text-align: center; }
+    .role-screen { width:min(1050px,100%); margin:auto; padding:clamp(22px,5vw,64px); display:grid; align-content:center; }
+    .role-intro { text-align:center; max-width:680px; margin:0 auto 28px; }
+    .role-intro h2 { margin:16px 0 8px; font-size:clamp(2.4rem,6vw,4.8rem); letter-spacing:-.07em; }
+    .role-intro p { color:var(--muted); line-height:1.6; }
+    .role-cards { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+    .role-card { text-align:left; border:1px solid var(--line); border-radius:22px; padding:22px; background:var(--panel); cursor:pointer; transition:.2s ease; }
+    .role-card:hover { translate:0 -4px; border-color:rgba(233,255,112,.4); }
+    .role-card.selected { border-color:var(--accent); box-shadow:0 0 0 3px rgba(233,255,112,.12),0 20px 45px rgba(0,0,0,.3); background:rgba(233,255,112,.07); }
+    .role-icon { font-size:2.5rem; }
+    .role-card h3 { margin:10px 0 5px; font-size:1.45rem; }
+    .role-card > p { color:var(--muted); min-height:42px; }
+    .role-points { display:grid; gap:8px; margin:17px 0 0; padding:0; list-style:none; font-size:.84rem; line-height:1.4; }
+    .role-points .plus::before { content:"+"; color:#54e38e; font-weight:1000; margin-right:7px; }
+    .role-points .minus::before { content:"−"; color:#ff7777; font-weight:1000; margin-right:7px; }
+    .role-confirm { width:min(420px,100%); margin:24px auto 0; }
+
+    .game { padding: clamp(12px, 2vw, 24px); }
+    .game-shell { width: min(1680px, 100%); margin: auto; }
+    .game-head { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+    .game-title { margin: 0; font-size: clamp(1.25rem, 3vw, 2rem); letter-spacing: -.04em; }
+    .room-pill { color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 7px 10px; font-size: .75rem; }
+    .round-pill { border-radius: 999px; padding: 7px 12px; font-size: .75rem; font-weight: 900; color: #101113; background: var(--accent); }
+    .live { margin-left: auto; display: flex; align-items: center; gap: 7px; color: #aeb0bb; font-size: .75rem; }
+    .live::before { content:""; width: 7px; height: 7px; border-radius: 50%; background: #54e38e; box-shadow: 0 0 12px #54e38e; }
+    .game-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: clamp(14px, 2vw, 26px); align-items: start; }
+    .board-card { border: 1px solid var(--line); border-radius: 22px; padding: clamp(8px, 1.5vw, 16px); background: rgba(14,15,21,.76); box-shadow: 0 24px 70px rgba(0,0,0,.3); }
+    .board-wrap {
+      width: min(720px, 100%); margin: auto; position: relative; aspect-ratio: 1; overflow: hidden;
+      border-radius: 24px;
+      background:
+        linear-gradient(145deg,rgba(255,255,255,.10),rgba(255,255,255,.02) 42%,rgba(0,0,0,.18)),
+        linear-gradient(135deg,#252934,#171a24);
+      box-shadow: inset 0 0 0 8px rgba(255,255,255,.07), inset 0 -22px 30px rgba(0,0,0,.38), 0 26px 65px rgba(0,0,0,.38);
+    }
+    .board-wrap::before {
+      content:""; position:absolute; inset:2.5%; z-index:0; pointer-events:none;
+      border-radius: 18px;
+      background:linear-gradient(145deg,rgba(255,255,255,.12),rgba(255,255,255,.02));
+      box-shadow:inset 0 0 0 2px rgba(255,255,255,.12), inset 0 0 0 10px rgba(0,0,0,.18);
+    }
+    .board-wrap::after {
+      content:""; position:absolute; left:10%; right:10%; bottom:3%; height:12%; z-index:0; pointer-events:none;
+      background:radial-gradient(ellipse,rgba(0,0,0,.48),transparent 68%); filter:blur(8px);
+    }
+    .board, #rewards, #traps, #obstacles, #items, #pieces, #scoreEffects {
+      position: absolute; inset: 0; z-index: 1;
+    }
+    .board { display:block; }
+    .cell {
+      border:1px solid rgba(255,255,255,.16); padding:0; min-width:0; cursor:pointer; border-radius:10px;
+      background:
+        radial-gradient(circle at 50% 38%,rgba(255,255,255,.20),transparent 48%),
+        linear-gradient(145deg,#f3efe4,#aeb3ae 62%,#6f746e);
+      box-shadow: inset 0 0 0 3px rgba(255,255,255,.58), inset 0 -8px 10px rgba(0,0,0,.24), 0 5px 0 #44483f, 0 9px 13px rgba(0,0,0,.28);
+      transition: filter .13s ease, box-shadow .13s ease, transform .13s ease;
+    }
+    .cell.alt {
+      background:
+        radial-gradient(circle at 50% 38%,rgba(255,255,255,.16),transparent 48%),
+        linear-gradient(145deg,#e2ded3,#989f98 62%,#5f655f);
+    }
+    .cell:hover, .cell:focus-visible {
+      filter:brightness(1.16); outline:none; z-index:4;
+      box-shadow: inset 0 0 0 4px #fff, inset 0 -8px 10px rgba(0,0,0,.24), 0 5px 0 #4d523f, 0 0 26px rgba(233,255,112,.45);
+    }
+    .cell.selected { box-shadow: inset 0 0 0 4px var(--accent), inset 0 -8px 10px rgba(0,0,0,.24), 0 5px 0 #60683a, 0 0 22px rgba(233,255,112,.55); z-index: 7; }
+    .cell.reachable {
+      filter:brightness(1.12) saturate(1.2);
+      box-shadow: inset 0 0 0 4px rgba(233,255,112,.82), inset 0 -8px 10px rgba(0,0,0,.24), 0 5px 0 #626a3b, 0 0 20px rgba(233,255,112,.42); z-index: 6;
+    }
+    .cell.reachable::after { content:""; position:absolute; inset:37%; border-radius:50%; background:var(--accent); opacity:.72; box-shadow:0 0 18px var(--accent); }
+    .cell.trap-target { box-shadow:inset 0 0 0 4px #ff9f43, inset 0 -8px 10px rgba(0,0,0,.24), 0 5px 0 #7b5228, 0 0 24px rgba(255,159,67,.55); }
+    .cell.trap-target::after { background:#ff9f43; border-radius:3px; rotate:45deg; }
+    .cell:not(.reachable) { cursor: default; }
+    .reward, .score-pop, .trap, .obstacle, .effect-pop, .map-item, .bridge-effect, .weapon-beam {
+      left:0; top:0;
+    }
+    .piece.shielded::after {
+      content:""; position:absolute; inset:-18%; border:2px solid #77ddff; border-radius:50%;
+      background:radial-gradient(circle,rgba(119,221,255,.08),rgba(119,221,255,.22));
+      box-shadow:0 0 14px #77ddff,inset 0 0 10px rgba(119,221,255,.55);
+      animation:shieldPulse 1.45s ease-in-out infinite;
+    }
+    .piece.shield-block::after { animation:shieldBlock .85s ease forwards; }
+    @keyframes shieldPulse { 50% { scale:1.18; opacity:.65; } }
+    @keyframes shieldBlock { 35% { scale:2; filter:brightness(2.2); box-shadow:0 0 45px #77ddff; } 100% { scale:.2; opacity:0; } }
+    .reward {
+      position:absolute; z-index:3; pointer-events:none;
+      display:grid; place-items:center;
+    }
+    .reward-gem {
+      width:var(--size); aspect-ratio:1; display:grid; place-items:center; rotate:45deg;
+      border-radius:28% 45% 28% 45%; background:var(--reward); border:1px solid rgba(255,255,255,.9);
+      box-shadow:0 0 12px var(--reward),0 3px 7px rgba(0,0,0,.55);
+      animation:rewardFloat 1.8s ease-in-out infinite;
+    }
+    .reward-gem span { rotate:-45deg; color:#101113; font-size:clamp(5px,.72vw,10px); font-weight:1000; }
+    .reward.collecting .reward-gem { animation:rewardCollect .65s ease forwards; }
+    .reward.locked .reward-gem {
+      background:#555866; border-style:dashed; filter:saturate(.35);
+      box-shadow:0 0 0 2px rgba(255,255,255,.08),0 3px 7px rgba(0,0,0,.55);
+      animation:none;
+    }
+    .reward-lock {
+      position:absolute; left:50%; top:calc(50% + 43%); translate:-50% 0;
+      min-width:max-content; padding:2px 4px; border-radius:5px; background:rgba(10,11,16,.92);
+      border:1px solid rgba(255,255,255,.2); color:#e8e6ee; font-size:clamp(5px,.55vw,8px); font-weight:950;
+    }
+    .reward.unlocking .reward-gem { animation:rewardUnlock 1.05s cubic-bezier(.2,.8,.25,1) both; }
+    .reward.unlocking .reward-lock { animation:lockVanish .5s ease forwards; }
+    @keyframes rewardUnlock {
+      0% { scale:.8; filter:brightness(.7) saturate(.3); }
+      45% { scale:1.8; filter:brightness(2); box-shadow:0 0 34px var(--reward),0 0 65px var(--reward); }
+      100% { scale:1; filter:brightness(1); }
+    }
+    @keyframes lockVanish { 100% { translate:-50% -120%; opacity:0; scale:.6; } }
+    @keyframes rewardFloat { 50% { translate:0 -14%; scale:1.08; } }
+    @keyframes rewardCollect { 45% { scale:1.55; filter:brightness(1.5); } 100% { scale:0; opacity:0; rotate:160deg; } }
+    .score-pop {
+      position:absolute; z-index:14; pointer-events:none;
+      margin-left:var(--offset,0px); display:grid; place-items:center;
+    }
+    .score-pop span {
+      white-space:nowrap; padding:4px 7px; border-radius:999px; color:#101113; background:var(--accent);
+      font-size:clamp(7px,.9vw,12px); font-weight:1000; box-shadow:0 5px 14px rgba(0,0,0,.42);
+      animation:scoreRise 1.25s ease forwards;
+    }
+    @keyframes scoreRise { 0% { translate:0 0; opacity:0; scale:.7; } 18% { opacity:1; scale:1.08; } 100% { translate:0 -190%; opacity:0; } }
+    .trap {
+      position:absolute; z-index:4; pointer-events:none; display:grid; place-items:center;
+    }
+    .trap-mark {
+      width:52%; aspect-ratio:1; rotate:45deg; border-radius:4px; display:grid; place-items:center;
+      background:#ff9f43; border:2px solid #fff3; box-shadow:0 0 12px #ff9f43;
+    }
+    .trap-mark span { rotate:-45deg; font-size:clamp(6px,.8vw,11px); }
+    .trap.own-trap .trap-mark { background:#ffb05c; box-shadow:0 0 10px #ff9f43,0 0 24px #ff9f43; animation:ownTrapGlow 1.3s ease-in-out infinite; }
+    @keyframes ownTrapGlow { 50%{scale:1.2;filter:brightness(1.35)} }
+    .trap.hidden-trap { opacity:0; }
+    .trap.triggered { opacity:1; z-index:13; }
+    .trap.triggered .trap-mark { animation:trapBurst 1s ease forwards; }
+    @keyframes trapBurst { 0%{scale:.4;opacity:0} 35%{scale:2.2;opacity:1;box-shadow:0 0 45px #ff9f43} 100%{scale:1.1;opacity:0;rotate:180deg} }
+    .obstacle {
+      position:absolute; z-index:4; pointer-events:none; display:grid; place-items:center;
+    }
+    .obstacle-stone {
+      width:82%; height:82%; border-radius:22% 32% 18% 28%; background:linear-gradient(145deg,#8a8f9f,#434754);
+      border:1px solid #cfd3df; box-shadow:inset -4px -5px 7px rgba(0,0,0,.35),0 5px 9px rgba(0,0,0,.55);
+      animation:obstacleAppear .6s cubic-bezier(.2,.9,.3,1) both;
+    }
+    .obstacle.removing .obstacle-stone { animation:obstacleVanish .7s ease forwards; }
+    .obstacle-life {
+      position:absolute; right:-5%; bottom:-8%; min-width:45%; padding:1px 3px; border-radius:999px;
+      background:#f4f0e7; color:#171821; font-size:clamp(5px,.55vw,8px); font-weight:1000; text-align:center;
+    }
+    @keyframes obstacleAppear { 0%{translate:0 -100%;scale:.2;opacity:0} 70%{translate:0 10%;scale:1.2} 100%{translate:0 0;scale:1;opacity:1} }
+    @keyframes obstacleVanish { 35%{scale:1.25;filter:brightness(1.5)} 100%{scale:0;opacity:0;rotate:35deg} }
+    .effect-pop {
+      position:absolute; z-index:15; pointer-events:none; display:grid; place-items:center;
+    }
+    .effect-pop span {
+      min-width:max-content; padding:5px 8px; border-radius:8px; background:#ff9f43; color:#17120b;
+      font-size:clamp(7px,.8vw,11px); font-weight:1000; animation:effectReveal 1.8s ease forwards;
+    }
+    @keyframes effectReveal { 0%{opacity:0;scale:.5} 15%{opacity:1;scale:1.12} 70%{opacity:1;translate:0 -100%} 100%{opacity:0;translate:0 -140%} }
+    .map-item {
+      position:absolute; z-index:4; pointer-events:none; display:grid; place-items:center;
+    }
+    .map-item-token {
+      width:68%; aspect-ratio:1; display:grid; place-items:center; border-radius:50%;
+      background:#eef2ff; color:#171821; border:2px solid var(--item); box-shadow:0 0 14px var(--item);
+      font-size:clamp(7px,1vw,13px); animation:itemHover 1.6s ease-in-out infinite;
+    }
+    .map-item.teleport .map-item-token { border-radius:28% 48%; rotate:45deg; background:#ded7ff; }
+    .map-item.teleport .map-item-token span { rotate:-45deg; }
+    .map-item.ladder .map-item-token { border-radius:8px; background:#fff0ba; border-style:double; }
+    .map-item.collecting .map-item-token { animation:itemCollect .7s ease forwards; }
+    @keyframes itemHover { 50%{translate:0 -18%;rotate:8deg} }
+    @keyframes itemCollect { 45%{scale:1.7;filter:brightness(1.5)} 100%{scale:0;opacity:0;translate:0 -80%} }
+    .inventory { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+    .item-button { border:1px solid var(--line); border-radius:10px; padding:7px 9px; background:rgba(255,255,255,.06); cursor:pointer; font-size:.75rem; font-weight:850; }
+    .item-button:hover { border-color:var(--accent); }
+    .item-button.active { background:#f5f1e8; color:#111 !important; box-shadow:0 0 0 2px #fff,0 0 18px rgba(255,255,255,.35); }
+    .item-button:disabled { opacity:.38; cursor:not-allowed; }
+    .piece.teleporting { animation:teleportPiece 1.25s ease; }
+    @keyframes teleportPiece { 0%,100%{opacity:1;filter:none} 35%{opacity:0;scale:.1;filter:hue-rotate(120deg)} 65%{opacity:0;scale:.1} }
+    .piece.trap-swallowed .pawn { animation:trapSwallow 1.15s cubic-bezier(.5,0,.8,.2) forwards; }
+    @keyframes trapSwallow { 0%{scale:1;rotate:0;filter:none} 35%{scale:1.35;rotate:-12deg} 100%{scale:0;rotate:220deg;opacity:0;filter:brightness(.2)} }
+    .piece.aiming .pawn { animation:aimShot .9s ease; transform-origin:50% 88%; }
+    .piece.bullet-hit .pawn { animation:bulletHit .85s ease; }
+    .piece.trap-step .pawn { animation:trapStep .5s ease; }
+    .piece.trap-caught .pawn { animation:trapCaught 1.05s cubic-bezier(.2,.7,.2,1) forwards; }
+    @keyframes aimShot { 0%,100%{rotate:0;scale:.86} 35%{rotate:-10deg;scale:1.05} 58%{rotate:6deg;filter:brightness(1.6)} }
+    @keyframes bulletHit { 0%{translate:0 0;filter:none} 30%{translate:-18% 0;filter:brightness(1.8)} 55%{translate:18% 0;filter:sepia(1)} 100%{translate:0 0;filter:none} }
+    @keyframes trapStep { 0%{translate:0 0} 45%{translate:0 -18%;rotate:-5deg} 100%{translate:0 0} }
+    @keyframes trapCaught { 0%{translate:0 0;rotate:0} 32%{translate:0 -8%;scale:1.05} 68%{translate:0 10%;rotate:-9deg;filter:brightness(.85)} 100%{translate:0 0;rotate:-4deg;filter:grayscale(.65) brightness(.85)} }
+    .trap.clamping .trap-mark { animation:trapClamp 1.05s ease forwards; }
+    @keyframes trapClamp { 0%{scale:.65;rotate:45deg;filter:brightness(.8)} 35%{scale:1.8;rotate:22deg;box-shadow:0 0 36px #ff9f43} 58%{scale:.82;rotate:0deg;filter:brightness(1.6)} 100%{scale:1;rotate:0deg;box-shadow:0 0 22px #ff5d57} }
+    .bridge-effect {
+      position:absolute; z-index:12; pointer-events:none; color:#ffd166; font-size:clamp(14px,2vw,25px);
+      text-shadow:0 0 12px #ffd166; animation:bridgeFlash 1.2s ease forwards;
+    }
+    @keyframes bridgeFlash { 0%{opacity:0;scale:.3} 25%,75%{opacity:1;scale:1.5} 100%{opacity:0;scale:.6} }
+    .weapon-beam {
+      position:absolute; z-index:16; pointer-events:none; display:grid; place-items:center;
+      color:#ff5d57; font-size:clamp(18px,3vw,36px); text-shadow:0 0 18px #ff5d57;
+      animation:weaponBlast 1.15s ease forwards;
+    }
+    @keyframes weaponBlast { 0%{opacity:0;scale:.2} 20%,65%{opacity:1;scale:1.8} 100%{opacity:0;translate:calc(var(--dx)*100%) calc(var(--dy)*100%);scale:.8} }
+    .weapon-beam.slow-bullet {
+      color:#ffd166; font-size:clamp(11px,1.7vw,20px); text-shadow:0 0 12px #fff,0 0 24px #ffd166;
+      animation:slowBullet 1.55s cubic-bezier(.15,.8,.15,1) forwards;
+    }
+    @keyframes slowBullet { 0%{opacity:0;scale:.35;translate:0 0} 12%{opacity:1;scale:1.25} 78%{opacity:1;scale:1.7;translate:calc(var(--tx)*100%) calc(var(--ty)*100%)} 100%{opacity:0;scale:2.25;translate:calc(var(--tx)*100%) calc(var(--ty)*100%)} }
+    .skip-overlay {
+      position:fixed; inset:0; z-index:60; display:grid; place-items:center; padding:24px;
+      background:rgba(18,19,24,.82); backdrop-filter:grayscale(1) blur(6px);
+      animation:skipOverlayIn .28s ease forwards;
+    }
+    .skip-card {
+      width:min(520px,92vw); border:1px solid rgba(255,255,255,.18); border-radius:28px; padding:28px;
+      background:linear-gradient(145deg,rgba(44,46,55,.96),rgba(16,17,22,.96)); text-align:center;
+      box-shadow:0 28px 90px rgba(0,0,0,.65);
+    }
+    .skip-card h2 { margin:8px 0 6px; font-size:clamp(2rem,8vw,4.2rem); letter-spacing:-.06em; }
+    .skip-card p { margin:0; color:#c9cbd3; line-height:1.45; }
+    .skip-avatar { margin:auto; width:112px; aspect-ratio:1; border-radius:42% 42% 34% 34%; display:grid; place-items:center; font-size:3rem; background:linear-gradient(145deg,#f1f1f1,var(--player)); border:5px solid #fff; box-shadow:0 0 30px var(--player); }
+    .skip-avatar.trap { animation:skipTrap .95s ease-in-out infinite; filter:grayscale(.55); }
+    .skip-avatar.bullet { animation:skipBullet .75s ease-in-out infinite; filter:grayscale(.7); }
+    @keyframes skipOverlayIn { from{opacity:0} to{opacity:1} }
+    @keyframes skipTrap { 50%{translate:0 7px;rotate:-4deg} }
+    @keyframes skipBullet { 50%{translate:8px 0;rotate:5deg} }
+    .action-cutscene {
+      position:fixed; inset:0; z-index:70; overflow:hidden; display:grid; place-items:center; padding:clamp(16px,4vw,42px);
+      background:
+        radial-gradient(circle at 50% 52%,rgba(255,255,255,.12),transparent 28%),
+        linear-gradient(135deg,rgba(116,20,28,.98),rgba(9,10,14,.98) 52%,rgba(116,20,28,.98));
+      animation:cutsceneIn .18s ease forwards;
+    }
+    .action-cutscene::before {
+      content:""; position:absolute; inset:-20%; opacity:.22;
+      background:repeating-linear-gradient(-18deg,transparent 0 18px,rgba(255,255,255,.18) 19px 22px);
+      animation:cutLines .95s linear infinite;
+    }
+    .action-cutscene.trap-scene {
+      background:
+        radial-gradient(circle at 50% 65%,rgba(255,159,67,.22),transparent 26%),
+        linear-gradient(135deg,rgba(90,52,15,.98),rgba(10,11,16,.98) 54%,rgba(151,79,21,.98));
+    }
+    .cutscene-panel {
+      position:relative; width:min(860px,96vw); min-height:min(420px,72vh);
+      display:grid; grid-template-columns:1fr minmax(90px,.55fr) 1fr; align-items:center; gap:clamp(12px,3vw,34px);
+    }
+    .cut-title {
+      position:absolute; left:50%; top:0; translate:-50% -20%; z-index:3; white-space:nowrap;
+      padding:8px 18px; border-radius:999px; background:#f5f1e8; color:#171821; border:4px solid #111;
+      font-weight:1000; font-size:clamp(1.05rem,3.8vw,2.4rem); text-transform:uppercase; letter-spacing:.02em;
+      box-shadow:0 12px 0 rgba(0,0,0,.45); animation:cutTitle .55s cubic-bezier(.2,1.4,.2,1) both;
+    }
+    .cut-character {
+      display:grid; place-items:center; gap:10px; color:white; text-align:center; min-width:0;
+      animation:cutPop .45s cubic-bezier(.2,1.4,.2,1) both;
+    }
+    .cut-character.victim { animation-delay:.16s; }
+    .cut-name { max-width:100%; padding:5px 10px; border-radius:999px; background:rgba(0,0,0,.52); border:1px solid rgba(255,255,255,.22); font-weight:950; overflow:hidden; text-overflow:ellipsis; }
+    .cut-avatar {
+      width:clamp(96px,24vw,190px); aspect-ratio:.78; border-radius:45% 45% 32% 32%;
+      position:relative; display:grid; place-items:center; font-size:clamp(2.4rem,8vw,5.6rem);
+      background:linear-gradient(145deg,#fff 0 16%,var(--actor) 18% 100%);
+      border:6px solid rgba(255,255,255,.96); box-shadow:0 18px 0 rgba(0,0,0,.38),0 0 42px var(--actor);
+    }
+    .cut-avatar::before {
+      content:""; position:absolute; top:18%; left:16%; width:56%; height:23%; border-radius:999px;
+      background:linear-gradient(145deg,#dff9ff,#5bc8ff); border:4px solid rgba(12,20,28,.75);
+      box-shadow:inset 0 6px 8px rgba(255,255,255,.55);
+    }
+    .cut-avatar span { position:relative; z-index:2; translate:0 22%; filter:drop-shadow(0 4px 2px rgba(0,0,0,.45)); }
+    .cut-character.shooter .cut-avatar { animation:cutAim .9s ease-in-out both; }
+    .cut-character.victim .cut-avatar.hit { animation:cutHit .85s ease-in-out both; }
+    .cut-middle { position:relative; height:180px; display:grid; place-items:center; }
+    .cut-bullet {
+      position:absolute; left:-72%; top:50%; width:38px; height:18px; border-radius:999px;
+      background:linear-gradient(90deg,#fff,#ffd166 48%,#f97316); box-shadow:0 0 22px #ffd166,0 0 64px #ff5d57;
+      animation:cutBullet 1.18s cubic-bezier(.1,.8,.12,1) .35s both;
+    }
+    .cut-bullet::after {
+      content:""; position:absolute; right:86%; top:50%; width:180px; height:7px; translate:0 -50%; border-radius:999px;
+      background:linear-gradient(90deg,transparent,rgba(255,209,102,.86));
+    }
+    .cut-flash {
+      position:absolute; left:-88%; top:50%; width:74px; aspect-ratio:1; translate:0 -50%; border-radius:50%;
+      background:radial-gradient(circle,#fff 0 18%,#ffd166 20% 42%,transparent 45%);
+      animation:cutFlash .42s ease .28s both;
+    }
+    .cut-trap {
+      position:absolute; inset:auto 50% 16% auto; translate:50% 0; width:clamp(96px,22vw,180px); aspect-ratio:1;
+      display:grid; place-items:center; font-size:clamp(3rem,10vw,6.4rem); filter:drop-shadow(0 18px 18px rgba(0,0,0,.55));
+      animation:cutTrapSnap 1.15s cubic-bezier(.25,1.4,.25,1) .28s both;
+    }
+    .trap-scene .cut-character.victim .cut-avatar { animation:cutTrapVictim 1.15s ease .15s both; }
+    .cut-caption {
+      position:absolute; left:50%; bottom:0; translate:-50% 20%; width:min(660px,92vw);
+      padding:10px 14px; border-radius:18px; background:rgba(0,0,0,.58); border:1px solid rgba(255,255,255,.18);
+      text-align:center; color:#f5f1e8; font-weight:850; line-height:1.35;
+    }
+    @keyframes cutsceneIn { from{opacity:0;scale:1.04} to{opacity:1;scale:1} }
+    @keyframes cutLines { to{translate:80px 0} }
+    @keyframes cutTitle { from{scale:.65;opacity:0} to{scale:1;opacity:1} }
+    @keyframes cutPop { from{opacity:0;scale:.72;translate:0 26px} to{opacity:1;scale:1;translate:0 0} }
+    @keyframes cutAim { 0%,100%{rotate:0;translate:0 0} 44%{rotate:-8deg;translate:8% 0} 63%{rotate:5deg;filter:brightness(1.45)} }
+    @keyframes cutBullet { 0%{opacity:0;translate:0 -50%;scale:.45} 15%{opacity:1} 82%{opacity:1;translate:220px -50%;scale:1.7} 100%{opacity:0;translate:250px -50%;scale:2.2} }
+    @keyframes cutFlash { 0%,100%{opacity:0;scale:.2} 34%{opacity:1;scale:1.45} }
+    @keyframes cutHit { 0%,35%{translate:0 0;rotate:0} 52%{translate:18px 0;rotate:8deg;filter:brightness(1.7)} 100%{translate:0 0;rotate:-3deg;filter:grayscale(.35)} }
+    @keyframes cutTrapSnap { 0%{scale:.7;rotate:18deg;opacity:.1} 42%{scale:1.5;rotate:-10deg;opacity:1} 62%{scale:.9;rotate:0;filter:brightness(1.8)} 100%{scale:1.08;rotate:0} }
+    @keyframes cutTrapVictim { 0%{translate:0 0;rotate:0} 38%{translate:0 -16px} 68%{translate:0 18px;rotate:-8deg;filter:brightness(.72)} 100%{translate:0 8px;rotate:-4deg;filter:grayscale(.55)} }
+    .side { display: grid; gap: 14px; }
+    .side-card { border: 1px solid var(--line); border-radius: 18px; padding: 16px; background: var(--panel); }
+    .side-label { margin: 0 0 12px; color: var(--muted); font-size: .7rem; text-transform: uppercase; letter-spacing: .12em; }
+    .current-player { display: flex; align-items: center; gap: 10px; }
+    .current-token { width: 36px; height: 36px; border-radius: 50%; background: var(--player); border: 3px solid white; box-shadow: 0 0 18px var(--player); }
+    .current-player small { color: var(--muted); }
+    .mini-roster { display: grid; gap: 10px; }
+    .mini-player { display: grid; grid-template-columns: 10px minmax(0,1fr) auto; gap: 9px; align-items: center; font-size: .82rem; color: #bbbcc5; }
+    .mini-player.turn { color: white; font-weight: 800; }
+    .player-meta { display:flex; align-items:center; justify-content:space-between; gap:7px; min-width:0; }
+    .player-score { color:var(--accent); font-weight:950; white-space:nowrap; }
+    .ready-mark { color: #54e38e; font-size: .75rem; font-weight: 900; }
+    .waiting-mark { color: #777986; font-size: .7rem; }
+    .coords { color: #777986; font-size: .7rem; font-variant-numeric: tabular-nums; }
+    .instruction { color: var(--muted); font-size: .82rem; line-height: 1.5; margin: 0; }
+    .round-recap { display:grid; gap:7px; max-height:210px; overflow:auto; }
+    .recap-event { padding:7px 9px; border-left:3px solid var(--event-color,var(--accent)); border-radius:5px; background:rgba(255,255,255,.045); font-size:.74rem; line-height:1.35; }
+    .recap-event strong { color:#fff; }
+    .round-finish { animation:roundFinish 1.2s ease; }
+    @keyframes roundFinish { 0%,100%{box-shadow:none} 35%{box-shadow:inset 0 0 0 5px var(--accent),0 0 45px rgba(233,255,112,.45)} }
+    .turn-timer {
+      margin: 12px 0 4px; padding: 9px 11px; border: 1px solid rgba(233,255,112,.35); border-radius: 14px;
+      background: rgba(233,255,112,.08); color: var(--accent); font-weight: 950; font-size: .86rem;
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .turn-timer.warning { border-color:#ff9f43; color:#ffb567; animation:timerPulse .65s ease-in-out infinite; }
+    .turn-timer.hidden { display:none; }
+    @keyframes timerPulse { 50% { scale:1.02; filter:brightness(1.25); } }
+    .turn-actions { display:grid; gap:9px; margin-top:14px; }
+    .secondary { width:100%; border:1px solid var(--line); border-radius:14px; padding:12px 14px; background:rgba(255,255,255,.055); cursor:pointer; font-weight:850; }
+    .secondary.active { border-color:#ff9f43; color:#ffb567; box-shadow:inset 0 0 0 2px rgba(255,159,67,.15); }
+    .secondary:disabled { opacity:.38; cursor:not-allowed; }
+    .phase-banner {
+      position:absolute; inset:0; display:grid; place-items:center; z-index:12; pointer-events:none;
+      background:rgba(10,11,16,.36); opacity:0; transition:opacity .25s ease;
+    }
+    .phase-banner.show { opacity:1; }
+    .phase-message { padding:13px 18px; border:1px solid var(--line); border-radius:999px; background:rgba(13,14,19,.92); font-weight:900; box-shadow:0 18px 40px rgba(0,0,0,.45); }
+    .game-over {
+      position:fixed; inset:0; z-index:30; overflow:auto; padding:clamp(18px,4vw,48px);
+      background:radial-gradient(circle at 50% 0%,rgba(233,255,112,.18),transparent 40%),rgba(8,9,13,.94); backdrop-filter:blur(14px);
+    }
+    .game-over-card { width:min(960px,100%); margin:auto; text-align:center; border:1px solid var(--line); border-radius:32px; padding:clamp(22px,4vw,42px); background:#171821; box-shadow:0 30px 90px rgba(0,0,0,.55); }
+    .game-over-card h2 { margin:14px 0 6px; font-size:clamp(2.6rem,7vw,5rem); letter-spacing:-.07em; }
+    .game-over-card p { color:var(--muted); line-height:1.55; }
+    .winner-stage { margin:28px auto; display:grid; place-items:center; }
+    .winner-orb { width:110px; aspect-ratio:1; border-radius:50%; display:grid; place-items:center; color:#111; background:var(--winner); border:6px solid #fff; font-size:2.6rem; font-weight:1000; box-shadow:0 0 0 8px rgba(233,255,112,.12),0 0 52px var(--winner); animation:winnerFloat 1.8s ease-in-out infinite; }
+    .winner-crown { font-size:2.4rem; margin-bottom:-12px; z-index:2; animation:crownBounce 1.2s ease-in-out infinite; }
+    @keyframes winnerFloat { 50%{translate:0 -8px;scale:1.05} }
+    @keyframes crownBounce { 50%{translate:0 -7px;rotate:5deg} }
+    .final-ranking { display:grid; gap:8px; text-align:left; }
+    .rank-row { display:grid; grid-template-columns:42px minmax(120px,1.2fr) repeat(5,minmax(64px,.6fr)); gap:8px; align-items:center; padding:12px 14px; border:1px solid var(--line); border-radius:14px; background:rgba(255,255,255,.035); }
+    .rank-row.winner { border-color:rgba(233,255,112,.55); background:rgba(233,255,112,.08); }
+    .rank-number { font-size:1.3rem; font-weight:1000; color:var(--accent); }
+    .rank-name { display:flex; align-items:center; gap:8px; font-weight:900; }
+    .rank-stat { text-align:center; font-size:.77rem; color:#d0ced8; }
+    .rank-stat b { display:block; color:#fff; font-size:1rem; }
+    .rank-head { color:var(--muted); font-size:.63rem; text-transform:uppercase; letter-spacing:.07em; }
+    .awards-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:22px 0; }
+    .award-card { border:1px solid var(--line); border-radius:16px; padding:14px; background:rgba(255,255,255,.04); }
+    .award-card span { display:block; font-size:1.45rem; margin-bottom:5px; }
+    .award-card small { color:var(--muted); display:block; }
+    .award-card strong { display:block; margin-top:4px; }
+    @media (max-width:760px) {
+      .rank-row { grid-template-columns:32px minmax(100px,1fr) repeat(2,minmax(54px,.5fr)); }
+      .rank-row .rank-stat:nth-child(n+5),.rank-head:nth-child(n+5) { display:none; }
+      .awards-grid { grid-template-columns:1fr 1fr; }
+    }
+    .pulse { animation: pulse 1.3s ease infinite; }
+    @keyframes pulse { 50% { opacity: .5; } }
+    .toast { position: fixed; left: 50%; bottom: 22px; translate: -50% 20px; padding: 10px 14px; border-radius: 999px; background: #f2efe6; color: #121318; font-weight: 800; font-size: .8rem; opacity: 0; pointer-events: none; transition: .25s ease; z-index: 20; }
+    .toast.show { opacity: 1; translate: -50% 0; }
+    .init-error {
+      position:fixed; inset:0; z-index:90; display:grid; place-items:center; padding:22px;
+      background:rgba(4,6,9,.86); backdrop-filter:blur(8px);
+    }
+    .init-error-card {
+      width:min(520px,100%); padding:28px; border-radius:22px;
+      border:1px solid rgba(255,112,112,.5); background:linear-gradient(180deg,#221315,#0b0c10);
+      box-shadow:0 30px 90px rgba(0,0,0,.65),0 0 35px rgba(255,80,80,.15); text-align:center;
+    }
+    .init-error-card h2 { margin:0 0 10px; color:#ff9b9b; }
+    .init-error-card p { color:#d9c9c9; line-height:1.55; }
+    .init-error-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:20px; }
+
+    /* Concept-art skin podle dodaného obrázku */
+    body {
+      background:
+        radial-gradient(circle at 70% -10%, rgba(244,137,45,.16), transparent 34rem),
+        radial-gradient(circle at 18% 18%, rgba(117,184,59,.12), transparent 30rem),
+        radial-gradient(circle at 100% 78%, rgba(37,151,255,.12), transparent 32rem),
+        linear-gradient(135deg,#05080b,#101014 46%,#07090c);
+      font-family: "Trebuchet MS", Inter, ui-sans-serif, system-ui, sans-serif;
+    }
+    body::before {
+      content:""; position:fixed; inset:0; pointer-events:none; z-index:-1;
+      background:
+        linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+      background-size:56px 56px; mask-image:radial-gradient(circle at 50% 35%,#000 0 42%,transparent 78%);
+    }
+    :root {
+      --panel: rgba(11,15,18,.91);
+      --line: rgba(221,164,83,.34);
+      --accent: #b8f05d;
+      --gold: #f5b640;
+      --orange: #ff8640;
+      --blue: #53c9ff;
+      --stone: #c08b58;
+      --stone-dark: #6d452d;
+    }
+    .brand { color:var(--gold); text-transform:uppercase; letter-spacing:.08em; text-shadow:0 0 18px rgba(245,182,64,.28); }
+    .brand-mark {
+      border-radius:8px; background:linear-gradient(145deg,#ffe39a,#a65e1d); color:#1b0f05;
+      box-shadow:inset 0 2px 0 rgba(255,255,255,.45),0 0 22px rgba(245,182,64,.28);
+    }
+    .card, .side-card, .game-over-card, .role-card, .board-card {
+      border-color:rgba(221,164,83,.38);
+      background:
+        linear-gradient(180deg,rgba(18,24,28,.96),rgba(8,11,13,.94)),
+        radial-gradient(circle at 50% 0,rgba(245,182,64,.08),transparent 42%);
+      box-shadow:0 20px 50px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.06);
+    }
+    .primary {
+      color:#261504;
+      background:linear-gradient(180deg,#ffe38a,#d08322 58%,#8f4912);
+      border:1px solid rgba(255,232,167,.68);
+      box-shadow:0 10px 24px rgba(217,117,24,.24), inset 0 2px 0 rgba(255,255,255,.48);
+      text-transform:uppercase; letter-spacing:.04em;
+    }
+    .secondary, .item-button, .icon-btn {
+      background:linear-gradient(180deg,rgba(42,51,56,.8),rgba(13,16,18,.86));
+      border-color:rgba(221,164,83,.35);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
+    }
+    .role-screen {
+      width:min(1560px,100%);
+      padding:clamp(10px,1.4vw,22px);
+    }
+    .role-intro {
+      max-width:none; margin:0 0 10px; padding:12px 16px; border:1px solid rgba(221,164,83,.34);
+      border-radius:18px; background:linear-gradient(180deg,rgba(11,16,20,.92),rgba(5,7,9,.86));
+    }
+    .role-intro h2 {
+      margin:8px 0 4px; font-size:clamp(1.8rem,3vw,3.2rem); text-transform:uppercase;
+      letter-spacing:.04em; color:#f4efe7; text-shadow:0 2px 0 #000,0 0 18px rgba(255,255,255,.14);
+    }
+    .role-cards { gap:10px; grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .role-card {
+      position:relative; min-height:450px; overflow:hidden; padding:16px 16px 18px;
+      border-radius:12px; display:flex; flex-direction:column; justify-content:flex-end;
+      isolation:isolate; transform-style:preserve-3d;
+    }
+    .role-card::before {
+      content:""; position:absolute; inset:46px 8px 8px; z-index:-2; border-radius:0 0 120px 120px / 0 0 42px 42px;
+      background:
+        radial-gradient(ellipse at 50% 100%,rgba(255,255,255,.13),transparent 36%),
+        linear-gradient(180deg,transparent,rgba(0,0,0,.66) 72%),
+        var(--role-bg);
+      box-shadow:inset 0 -90px 100px rgba(0,0,0,.72);
+    }
+    .role-card::after {
+      content:var(--role-avatar); position:absolute; left:50%; top:52px; translate:-50% 0; z-index:-1;
+      width:70%; aspect-ratio:.72; display:grid; place-items:center; font-size:clamp(7.2rem,14vw,15rem);
+      filter:drop-shadow(0 26px 16px rgba(0,0,0,.58)) drop-shadow(0 0 28px var(--role-glow));
+      animation:heroIdle 3.2s ease-in-out infinite;
+    }
+    .role-card[data-role-choice="hunter"] {
+      --role-avatar:"🏹"; --role-glow:#9be84f;
+      --role-bg: radial-gradient(circle at 50% 42%,rgba(134,220,68,.28),transparent 34%), linear-gradient(135deg,#142216,#070b09);
+      color:#d9ff96;
+    }
+    .role-card[data-role-choice="cowboy"] {
+      --role-avatar:"🤠"; --role-glow:#ff8a35;
+      --role-bg: radial-gradient(circle at 50% 42%,rgba(255,129,38,.32),transparent 34%), linear-gradient(135deg,#2b160b,#080808);
+      color:#ff9a45;
+    }
+    .role-card[data-role-choice="jumper"] {
+      --role-avatar:"👨‍🚀"; --role-glow:#4fc8ff;
+      --role-bg: radial-gradient(circle at 50% 42%,rgba(60,179,255,.32),transparent 34%), linear-gradient(135deg,#081b2a,#090b14);
+      color:#5acbff;
+    }
+    .role-card h3 {
+      margin:0 0 8px; padding:8px 10px; border-radius:10px;
+      background:linear-gradient(90deg,rgba(0,0,0,.72),rgba(0,0,0,.18));
+      font-size:clamp(1.35rem,2.4vw,2rem); text-transform:uppercase; letter-spacing:.05em;
+      text-shadow:0 2px 0 #000;
+    }
+    .role-card h3::before {
+      content:counter(role-card) ". ";
+    }
+    .role-cards { counter-reset:role-card; }
+    .role-card { counter-increment:role-card; }
+    .role-icon { display:none; }
+    .role-card > p {
+      min-height:auto; margin:0 0 8px; color:#f3efe7; font-weight:900; text-transform:uppercase;
+      text-shadow:0 2px 8px #000;
+    }
+    .role-points {
+      max-height:174px; overflow:auto; margin:0; padding:10px; border-radius:12px;
+      background:rgba(0,0,0,.48); border:1px solid rgba(255,255,255,.1);
+      color:#f6f0df; backdrop-filter:blur(4px);
+    }
+    .role-card.selected {
+      border-color:currentColor; box-shadow:0 0 0 2px currentColor,0 26px 70px rgba(0,0,0,.55),0 0 36px var(--role-glow);
+      background:linear-gradient(180deg,rgba(18,25,27,.96),rgba(6,8,9,.96));
+    }
+    @keyframes heroIdle { 50% { translate:-50% -10px; scale:1.035; } }
+
+    .game-shell { width:min(1560px,100%); }
+    .game-head {
+      padding:8px 12px; border:1px solid rgba(221,164,83,.34); border-radius:14px;
+      background:linear-gradient(180deg,rgba(15,20,24,.96),rgba(6,8,10,.9));
+      box-shadow:0 14px 38px rgba(0,0,0,.36);
+    }
+    .game-title {
+      text-transform:uppercase; letter-spacing:.08em; color:#f4efe7; text-shadow:0 2px 0 #000;
+    }
+    .round-pill, .room-pill {
+      border:1px solid rgba(221,164,83,.36);
+      background:linear-gradient(180deg,rgba(41,47,50,.95),rgba(10,12,14,.9));
+      color:#f4efe7;
+    }
+    .round-pill { color:#1d1003; background:linear-gradient(180deg,#ffe38a,#ca741e); }
+    .game-layout { grid-template-columns:minmax(0,1fr) 334px; }
+    .board-card {
+      position:relative; padding:10px; border-radius:12px;
+    }
+    .board-card::before {
+      content:"4. HERNÍ POLE (10×10)"; display:block; margin:-1px -1px 0; padding:10px 14px;
+      border-radius:10px 10px 0 0; border-bottom:1px solid rgba(221,164,83,.28);
+      background:linear-gradient(180deg,#151b22,#07090c); color:#f4efe7;
+      text-align:center; font-size:clamp(1.1rem,2vw,1.65rem); font-weight:1000; letter-spacing:.04em;
+      text-shadow:0 2px 0 #000;
+    }
+    .board-wrap {
+      width:min(900px,100%); border-radius:8px; margin-top:0;
+      background:
+        radial-gradient(circle at 8% 12%,rgba(45,98,74,.26),transparent 10%),
+        radial-gradient(circle at 82% 18%,rgba(175,83,28,.34),transparent 13%),
+        radial-gradient(circle at 92% 86%,rgba(117,69,34,.38),transparent 15%),
+        linear-gradient(180deg,#58402d,#2f2118);
+      box-shadow:inset 0 0 0 5px #2a160d,inset 0 0 0 8px rgba(255,211,130,.16),0 28px 58px rgba(0,0,0,.58);
+    }
+    .board-wrap::before {
+      inset:0; border-radius:8px;
+      background:
+        radial-gradient(circle at 12% 18%,rgba(72,52,35,.8) 0 1.2%,transparent 1.4%),
+        radial-gradient(circle at 86% 12%,rgba(26,16,10,.55) 0 1.1%,transparent 1.3%),
+        radial-gradient(circle at 9% 88%,rgba(30,20,14,.65) 0 1.3%,transparent 1.5%),
+        linear-gradient(90deg,rgba(255,255,255,.05),transparent 12%,transparent 88%,rgba(0,0,0,.24));
+      box-shadow:inset 0 0 0 3px rgba(255,226,160,.15),inset 0 -22px 38px rgba(0,0,0,.35);
+    }
+    .cell {
+      border-radius:7px; border:1px solid rgba(104,61,30,.72);
+      background:
+        radial-gradient(circle at 30% 24%,rgba(255,230,182,.35),transparent 18%),
+        radial-gradient(circle at 78% 72%,rgba(113,69,32,.28),transparent 18%),
+        linear-gradient(145deg,#d6a36b,#b67b47 50%,#8c5831);
+      box-shadow:inset 0 1px 0 rgba(255,231,186,.42), inset 0 -8px 12px rgba(92,45,18,.34);
+    }
+    .cell.alt {
+      background:
+        radial-gradient(circle at 66% 28%,rgba(255,230,182,.25),transparent 18%),
+        radial-gradient(circle at 20% 72%,rgba(92,47,24,.22),transparent 17%),
+        linear-gradient(145deg,#c99158,#aa7040 50%,#7e4d2d);
+    }
+    .cell:hover, .cell:focus-visible {
+      filter:brightness(1.2) saturate(1.12);
+      box-shadow:inset 0 0 0 3px #ffe39a, inset 0 -8px 12px rgba(92,45,18,.34),0 0 20px rgba(245,182,64,.62);
+    }
+    .cell.reachable {
+      background:
+        radial-gradient(circle at 50% 50%,rgba(184,240,93,.5),transparent 38%),
+        linear-gradient(145deg,#bcd564,#7ea13b);
+      box-shadow:inset 0 0 0 3px rgba(193,255,91,.92),0 0 18px rgba(184,240,93,.62);
+    }
+    .cell.reachable::after {
+      content:"🐾"; inset:0; display:grid; place-items:center; border-radius:0;
+      background:transparent; color:rgba(87,125,31,.86); font-size:clamp(10px,1.7vw,24px);
+      opacity:.95; box-shadow:none; text-shadow:0 1px 0 rgba(255,255,255,.35);
+    }
+    .cell.selected {
+      background:
+        radial-gradient(circle at 50% 50%,rgba(255,58,46,.48),transparent 38%),
+        linear-gradient(145deg,#d97354,#9f3328);
+      box-shadow:inset 0 0 0 3px #ff3b30,0 0 24px rgba(255,59,48,.72);
+    }
+    .cell.trap-target {
+      background:
+        radial-gradient(circle at 50% 50%,rgba(255,80,44,.42),transparent 40%),
+        linear-gradient(145deg,#d58b4f,#92351f);
+      box-shadow:inset 0 0 0 3px #ff622e,0 0 22px rgba(255,98,46,.65);
+    }
+
+
+    .reward-gem {
+      border-radius:18px; rotate:0deg;
+      background:
+        radial-gradient(circle at 50% 34%,rgba(255,255,255,.7),transparent 21%),
+        linear-gradient(145deg,var(--reward),#6f3109);
+      border:3px solid rgba(255,225,149,.86);
+      box-shadow:inset 0 -10px 16px rgba(0,0,0,.34),0 0 22px var(--reward),0 8px 16px rgba(0,0,0,.42);
+      clip-path:polygon(18% 0,82% 0,100% 18%,100% 82%,82% 100%,18% 100%,0 82%,0 18%);
+    }
+    .reward-gem span {
+      rotate:0deg; color:#fff6c8; font-size:clamp(8px,1.25vw,18px);
+      text-shadow:0 2px 0 #4b2109,0 0 12px rgba(255,255,255,.38);
+    }
+    .reward.locked .reward-gem {
+      background:linear-gradient(145deg,#39424a,#121820); border-color:#8fb6ca; box-shadow:0 0 18px rgba(83,201,255,.32);
+    }
+    .reward-lock {
+      background:linear-gradient(180deg,#1a2025,#050709); color:#eaf7ff; border-color:rgba(83,201,255,.5);
+    }
+
+    .map-item-token {
+      width:72%; border:3px solid var(--item); color:#fff; font-size:clamp(12px,1.65vw,25px);
+      background:radial-gradient(circle at 50% 35%,rgba(255,255,255,.36),transparent 22%),linear-gradient(180deg,#242b30,#07090b);
+      box-shadow:inset 0 -10px 14px rgba(0,0,0,.36),0 0 22px var(--item),0 9px 14px rgba(0,0,0,.46);
+    }
+    .map-item.teleport .map-item-token {
+      border-radius:50%; rotate:0deg;
+      background:
+        radial-gradient(circle at 50% 50%,#c9f7ff 0 6%,#13a8ff 7% 18%,transparent 19%),
+        conic-gradient(from 20deg,#113bff,#20e7ff,#0b5bff,#20e7ff,#113bff);
+      box-shadow:0 0 24px #14c8ff,0 0 44px rgba(20,200,255,.4);
+    }
+    .map-item.teleport .map-item-token span { rotate:0deg; opacity:.25; }
+    .map-item.ladder .map-item-token {
+      border-radius:11px; background:linear-gradient(145deg,#ffedac,#a96922); color:#4a2308; border-color:#ffe79b;
+    }
+    .map-item.shield .map-item-token {
+      border-radius:24% 24% 50% 50%; background:linear-gradient(145deg,#e8fbff,#1677bc 62%,#0a315a); border-color:#c9f7ff;
+      box-shadow:0 0 25px #53c9ff, inset 0 -10px 14px rgba(0,0,0,.32);
+    }
+    .trap-mark {
+      border-radius:50%; background:
+        radial-gradient(circle at 50% 50%,#2b2b2b 0 18%,transparent 19%),
+        conic-gradient(from 0deg,#d9d1c8 0 8%,#5d5650 8% 16%,#d9d1c8 16% 24%,#5d5650 24% 32%,#d9d1c8 32% 40%,#5d5650 40% 48%,#d9d1c8 48% 56%,#5d5650 56% 64%,#d9d1c8 64% 72%,#5d5650 72% 80%,#d9d1c8 80% 88%,#5d5650 88% 100%);
+      border-color:#ff4b2f; box-shadow:0 0 22px #ff4b2f;
+    }
+    .trap-mark span { filter:drop-shadow(0 2px 1px #000); }
+    .obstacle-stone {
+      width:88%; height:88%; border-radius:12px;
+      background:
+        linear-gradient(90deg,transparent 0 18%,rgba(0,0,0,.28) 19% 21%,transparent 22% 78%,rgba(0,0,0,.28) 79% 81%,transparent 82%),
+        linear-gradient(145deg,#9a5c24,#4a2813);
+      border:2px solid #d29a52; box-shadow:inset 0 4px 0 rgba(255,229,168,.26),0 8px 12px rgba(0,0,0,.48);
+    }
+    .side-card {
+      border-radius:12px; padding:14px;
+    }
+    .side-label {
+      margin:-14px -14px 12px; padding:10px 12px; border-radius:12px 12px 0 0;
+      background:linear-gradient(180deg,#161d22,#07090b); color:#f4efe7;
+      text-align:center; font-size:1rem; font-weight:1000; letter-spacing:.06em;
+    }
+    .mini-player {
+      grid-template-columns:28px minmax(0,1fr) auto; padding:7px; border-radius:10px;
+      background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.07);
+    }
+    .mini-player.turn {
+      background:linear-gradient(90deg,rgba(184,240,93,.24),rgba(184,240,93,.05)); border-color:rgba(184,240,93,.45);
+    }
+    .dot {
+      width:24px; height:24px; border:2px solid rgba(255,236,204,.88);
+      box-shadow:0 0 14px var(--player), inset 0 -4px 7px rgba(0,0,0,.28);
+    }
+    .player-score { color:#ffe08a; }
+    .current-token {
+      border-radius:14px; background:linear-gradient(145deg,#fff,var(--player)); box-shadow:0 0 20px var(--player);
+    }
+    .phase-message {
+      border:2px solid rgba(255,226,154,.5); background:linear-gradient(180deg,#16100a,#050403);
+      color:#fff2d7; text-transform:uppercase; letter-spacing:.04em; box-shadow:0 18px 42px rgba(0,0,0,.62),0 0 24px rgba(245,182,64,.25);
+    }
+    .game-over-card {
+      background:
+        radial-gradient(circle at 50% 0,rgba(245,182,64,.2),transparent 36%),
+        linear-gradient(180deg,#151a1e,#07090b);
+    }
+    .winner-orb {
+      background:linear-gradient(145deg,#fff5b9,var(--winner)); border-color:#ffe4a0;
+      box-shadow:0 0 0 8px rgba(245,182,64,.18),0 0 64px var(--winner);
+    }
+
+    /* Přesný artboard podle dodaného obrázku */
+    .role-screen {
+      width:min(1536px,100%);
+      min-height:auto;
+      aspect-ratio:3/2;
+      margin:clamp(8px,1.5vw,18px) auto;
+      padding:0;
+      position:relative;
+      background:transparent;
+      border-radius:12px;
+      box-shadow:0 30px 90px rgba(0,0,0,.72);
+      overflow:hidden;
+    }
+    .role-screen .role-intro {
+      position:absolute; left:0; top:0; width:55.2%; height:45.5%;
+      margin:0; padding:0; border:0; background:transparent; pointer-events:none;
+    }
+    .role-screen .role-intro .brand,
+    .role-screen .role-intro h2,
+    .role-screen .role-intro p {
+      position:absolute; width:1px; height:1px; overflow:hidden; opacity:0;
+    }
+    .role-screen .role-cards {
+      position:absolute; left:.72%; top:1.05%; width:54.6%; height:44.2%;
+      display:grid; grid-template-columns:repeat(3,1fr); gap:.55%; pointer-events:auto;
+    }
+    .role-screen .role-card {
+      min-height:0; height:100%; border-radius:10px; opacity:.01;
+      padding:0; background:transparent; border:2px solid transparent; box-shadow:none;
+    }
+    .role-screen .role-card::before,
+    .role-screen .role-card::after,
+    .role-screen .role-card h3,
+    .role-screen .role-card p,
+    .role-screen .role-card ul {
+      display:none;
+    }
+    .role-screen .role-card:hover,
+    .role-screen .role-card.selected {
+      opacity:1; background:rgba(184,240,93,.07); border-color:#b8f05d;
+      box-shadow:inset 0 0 0 3px rgba(184,240,93,.5),0 0 24px rgba(184,240,93,.55);
+    }
+    .role-screen .role-card[data-role-choice="cowboy"].selected,
+    .role-screen .role-card[data-role-choice="cowboy"]:hover {
+      border-color:#ff8640; background:rgba(255,134,64,.08);
+      box-shadow:inset 0 0 0 3px rgba(255,134,64,.48),0 0 24px rgba(255,134,64,.55);
+    }
+    .role-screen .role-card[data-role-choice="jumper"].selected,
+    .role-screen .role-card[data-role-choice="jumper"]:hover {
+      border-color:#53c9ff; background:rgba(83,201,255,.08);
+      box-shadow:inset 0 0 0 3px rgba(83,201,255,.48),0 0 24px rgba(83,201,255,.55);
+    }
+    .role-screen .role-confirm {
+      position:absolute; left:1.45%; bottom:2.05%; width:18.2%; margin:0;
+    }
+    .role-screen .role-confirm .primary {
+      padding:13px 14px; border-radius:8px; font-size:.9rem;
+    }
+
+    #gameScreen.game {
+      min-height:100svh;
+      padding:clamp(6px,1.2vw,14px);
+      display:grid;
+      place-items:center;
+      background:
+        radial-gradient(circle at 50% 30%,rgba(244,137,45,.13),transparent 38rem),
+        #05070a;
+    }
+    #gameScreen .game-shell {
+      width:min(1536px,100%);
+      aspect-ratio:3/2;
+      position:relative;
+      margin:auto;
+      background:transparent;
+      border-radius:12px;
+      box-shadow:0 30px 90px rgba(0,0,0,.72);
+      overflow:hidden;
+    }
+    #gameScreen .game-head {
+      position:absolute; left:55.6%; top:.9%; width:43.7%; height:4.8%;
+      padding:0; margin:0; border:0; background:transparent; box-shadow:none;
+      display:flex; justify-content:center; pointer-events:none;
+    }
+    #gameScreen .game-head .brand,
+    #gameScreen .game-title,
+    #gameScreen .room-pill,
+    #gameScreen .live {
+      display:none;
+    }
+    #gameScreen .round-pill {
+      position:absolute; right:1.2%; top:10%;
+      border-radius:999px; padding:6px 12px; font-size:.8rem;
+      background:rgba(4,7,10,.75); color:#fff2d7; border-color:rgba(255,226,154,.48);
+      box-shadow:0 0 18px rgba(0,0,0,.55);
+    }
+    #gameScreen .game-layout {
+      position:absolute; inset:0; display:block; pointer-events:none;
+    }
+    #gameScreen .board-card {
+      position:absolute; left:55.55%; top:5.75%; width:43.85%; height:44.95%;
+      padding:0; border:0; border-radius:8px; background:transparent; box-shadow:none;
+      overflow:hidden; pointer-events:auto;
+    }
+    #gameScreen .board-card::before { display:none; }
+    #gameScreen .board-wrap {
+      width:100%; height:100%; margin:0; border-radius:8px;
+      background:transparent; box-shadow:none; overflow:hidden;
+    }
+    #gameScreen .board-wrap::before,
+    #gameScreen .board-wrap::after {
+      display:none;
+    }
+    #gameScreen .cell {
+      background:transparent;
+      border:1px solid rgba(77,178,255,.2);
+      box-shadow:none;
+      border-radius:4px;
+    }
+    #gameScreen .cell.alt { background:transparent; }
+    #gameScreen .cell:hover,
+    #gameScreen .cell:focus-visible {
+      background:rgba(83,201,255,.12);
+      box-shadow:inset 0 0 0 2px rgba(83,201,255,.72),0 0 16px rgba(83,201,255,.5);
+    }
+    #gameScreen .cell.reachable {
+      background:rgba(159,220,67,.35);
+      box-shadow:inset 0 0 0 2px rgba(184,240,93,.9),0 0 18px rgba(184,240,93,.66);
+    }
+    #gameScreen .cell.reachable::after {
+      content:""; inset:25%; border-radius:8px;
+      background:rgba(184,240,93,.45); box-shadow:0 0 15px rgba(184,240,93,.85);
+    }
+    #gameScreen .cell.selected,
+    #gameScreen .cell.trap-target {
+      background:rgba(255,62,45,.34);
+      box-shadow:inset 0 0 0 2px rgba(255,62,45,.95),0 0 20px rgba(255,62,45,.75);
+    }
+    #gameScreen .side {
+      position:absolute; left:1.45%; bottom:2.1%; width:18.2%; height:23%;
+      display:block; pointer-events:auto;
+    }
+    #gameScreen .side-card {
+      display:none;
+    }
+    #gameScreen .side-card:first-child {
+      display:block; height:100%; overflow:auto;
+      padding:8px; border-radius:8px;
+      background:rgba(6,9,11,.72); border-color:rgba(184,240,93,.42);
+      box-shadow:0 0 22px rgba(0,0,0,.42), inset 0 0 0 1px rgba(255,255,255,.05);
+      backdrop-filter:blur(6px);
+    }
+    #gameScreen .side-card:first-child .side-label {
+      display:block; margin:-8px -8px 6px; padding:5px 7px; font-size:.64rem;
+      background:linear-gradient(180deg,rgba(18,26,16,.92),rgba(5,8,5,.72)); color:#b8f05d;
+    }
+    #gameScreen .current-player {
+      display:flex; gap:6px; margin-bottom:5px; font-size:.62rem; line-height:1.1;
+    }
+    #gameScreen .current-token { width:22px; height:22px; border-width:2px; flex:0 0 auto; }
+    #gameScreen .current-player small { font-size:.55rem; }
+    #gameScreen .inventory {
+      display:flex; gap:3px; margin:0 0 5px; max-height:34px; overflow:auto;
+    }
+    #gameScreen .item-button {
+      padding:3px 5px; border-radius:5px; font-size:.54rem; max-width:100%; white-space:nowrap;
+    }
+    #gameScreen .turn-actions {
+      display:grid; grid-template-columns:1fr 1fr; gap:4px; margin:0;
+    }
+    #gameScreen .turn-actions .secondary {
+      display:block; padding:4px 5px; border-radius:5px; font-size:.55rem; min-height:24px;
+    }
+    #gameScreen #confirmMove {
+      grid-column:1 / -1; min-height:30px; padding:6px 8px; border-radius:6px; font-size:.64rem;
+    }
+    #gameScreen #turnTimer {
+      margin:0 0 5px; padding:5px 7px; border-radius:7px; font-size:.7rem;
+    }
+    #gameScreen .reward,
+    #gameScreen .trap,
+    #gameScreen .obstacle,
+    #gameScreen .map-item,
+    #gameScreen .score-pop,
+    #gameScreen .effect-pop,
+    #gameScreen .weapon-beam {
+      width:10%; height:10%;
+    }
+    #gameScreen .phase-banner {
+      border-radius:8px;
+    }
+    #gameScreen .phase-message {
+      transform:scale(.9);
+    }
+
+    @media (max-width: 760px) {
+      .role-screen,
+      #gameScreen .game-shell {
+        width:100%;
+      }
+      #gameScreen.game {
+        place-items:start center;
+      }
+      #gameScreen .side {
+        left:1.5%; bottom:1.2%; width:25%; height:13%;
+      }
+      #gameScreen #confirmMove {
+        font-size:.62rem; min-height:30px;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .lobby { grid-template-columns: 1fr; align-items: start; padding: 22px 16px 34px; }
+      .hero { padding-top: 8px; }
+      h1 { margin-top: 22px; }
+      .feature-row { margin-top: 22px; }
+      .game { padding: 10px; }
+      .game-layout { grid-template-columns: 1fr; }
+      .board-wrap { width: 100%; }
+      .side { grid-template-columns: 1fr 1fr; }
+      .side-card:first-child { grid-column: 1 / -1; }
+      .mini-player { font-size: .75rem; }
+      .game-head .brand { display: none; }
+      .role-cards { grid-template-columns:1fr; }
+      .role-card > p { min-height:0; }
+    }
+    @media (max-width: 430px) {
+      .side { grid-template-columns: 1fr; }
+      .side-card:first-child { grid-column: auto; }
+      .side-card:nth-child(2) { padding: 13px; }
+      .mini-roster { grid-template-columns: 1fr 1fr; }
+      .board-card { border-radius: 16px; }
+      .board-wrap { border-radius: 10px; }
+    }
+
+    /* Návrat z artboardu + nová komponenta: hrací plocha podle dodané fotky */
+    .role-screen {
+      width:min(1050px,100%) !important;
+      min-height:100svh !important;
+      aspect-ratio:auto !important;
+      margin:auto !important;
+      padding:clamp(22px,5vw,64px) !important;
+      display:grid !important;
+      align-content:center !important;
+      position:static !important;
+      background:transparent !important;
+      border-radius:0 !important;
+      box-shadow:none !important;
+      overflow:visible !important;
+    }
+    .role-screen .role-intro,
+    .role-screen .role-cards,
+    .role-screen .role-confirm {
+      position:static !important;
+      width:auto !important;
+      height:auto !important;
+      margin:revert !important;
+      padding:revert !important;
+      pointer-events:auto !important;
+    }
+    .role-screen .role-intro .brand,
+    .role-screen .role-intro h2,
+    .role-screen .role-intro p,
+    .role-screen .role-card h3,
+    .role-screen .role-card p,
+    .role-screen .role-card ul {
+      position:static !important;
+      width:auto !important;
+      height:auto !important;
+      overflow:visible !important;
+      opacity:1 !important;
+      display:revert !important;
+    }
+    .role-screen .role-card {
+      min-height:450px !important;
+      height:auto !important;
+      opacity:1 !important;
+      padding:16px 16px 18px !important;
+      background:var(--panel) !important;
+      border:1px solid var(--line) !important;
+      box-shadow:0 20px 50px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.06) !important;
+    }
+    #gameScreen.game {
+      min-height:100svh !important;
+      padding:clamp(12px,2vw,24px) !important;
+      display:block !important;
+      background:
+        radial-gradient(circle at 70% -10%, rgba(244,137,45,.16), transparent 34rem),
+        radial-gradient(circle at 18% 18%, rgba(117,184,59,.12), transparent 30rem),
+        #05080b !important;
+    }
+    #gameScreen .game-shell {
+      width:min(1680px,100%) !important;
+      aspect-ratio:auto !important;
+      position:static !important;
+      margin:auto !important;
+      background:transparent !important;
+      border-radius:0 !important;
+      box-shadow:none !important;
+      overflow:visible !important;
+    }
+    #gameScreen .game-head {
+      position:static !important;
+      width:auto !important;
+      height:auto !important;
+      padding:8px 12px !important;
+      margin-bottom:14px !important;
+      border:1px solid rgba(221,164,83,.34) !important;
+      background:linear-gradient(180deg,rgba(15,20,24,.96),rgba(6,8,10,.9)) !important;
+      box-shadow:0 14px 38px rgba(0,0,0,.36) !important;
+      display:flex !important;
+      pointer-events:auto !important;
+    }
+    #gameScreen .game-head .brand,
+    #gameScreen .game-title,
+    #gameScreen .room-pill,
+    #gameScreen .live {
+      display:flex !important;
+    }
+    #gameScreen .game-layout {
+      position:static !important;
+      inset:auto !important;
+      display:grid !important;
+      grid-template-columns:minmax(0,1fr) 334px !important;
+      gap:clamp(14px,2vw,26px) !important;
+      pointer-events:auto !important;
+    }
+    #gameScreen .board-card {
+      position:relative !important;
+      left:auto !important;
+      top:auto !important;
+      width:auto !important;
+      height:auto !important;
+      padding:clamp(8px,1.5vw,16px) !important;
+      border:1px solid rgba(221,164,83,.38) !important;
+      border-radius:22px !important;
+      background:rgba(14,15,21,.76) !important;
+      box-shadow:0 24px 70px rgba(0,0,0,.3) !important;
+      overflow:visible !important;
+      pointer-events:auto !important;
+    }
+    #gameScreen .board-card::before {
+      display:none !important;
+    }
+    #gameScreen .board-wrap {
+      width:min(940px,100%) !important;
+      height:auto !important;
+      aspect-ratio:1 !important;
+      margin:auto !important;
+      border-radius:18px !important;
+      overflow:hidden !important;
+      background:url("assets/board-fantasy.png") center/cover no-repeat !important;
+      box-shadow:0 26px 70px rgba(0,0,0,.58), inset 0 0 0 2px rgba(255,226,154,.26) !important;
+    }
+    #gameScreen .board-wrap::before,
+    #gameScreen .board-wrap::after {
+      display:none !important;
+    }
+    #gameScreen .cell {
+      position:static !important;
+      width:auto !important;
+      height:auto !important;
+      border:0 !important;
+      border-radius:0 !important;
+      fill:rgba(255,255,255,.012) !important;
+      stroke:rgba(255,232,188,.13) !important;
+      stroke-width:1.5 !important;
+      vector-effect:non-scaling-stroke;
+      pointer-events:all;
+      transform:none !important;
+      box-shadow:none !important;
+      transition:fill .14s ease,stroke .14s ease,filter .14s ease !important;
+    }
+    #gameScreen .cell.alt {
+      fill:rgba(0,0,0,.012) !important;
+    }
+    #gameScreen .cell:hover,
+    #gameScreen .cell:focus-visible {
+      fill:rgba(83,201,255,.20) !important;
+      stroke:rgba(83,201,255,.95) !important;
+      stroke-width:3 !important;
+      filter:drop-shadow(0 0 8px rgba(83,201,255,.8)) !important;
+      outline:none !important;
+    }
+    #gameScreen .cell.reachable {
+      fill:rgba(159,220,67,.34) !important;
+      stroke:rgba(184,240,93,.98) !important;
+      stroke-width:3 !important;
+      stroke-dasharray:3 5 !important;
+      filter:drop-shadow(0 0 9px rgba(184,240,93,.82)) !important;
+    }
+    #gameScreen .cell.selected {
+      fill:rgba(255,202,58,.34) !important;
+      stroke:rgba(255,222,92,.98) !important;
+      stroke-width:3 !important;
+      filter:drop-shadow(0 0 9px rgba(255,202,58,.82)) !important;
+    }
+    #gameScreen .cell.ability-invalid {
+      fill:rgba(255,62,45,.30) !important;
+      stroke:rgba(255,82,62,.98) !important;
+      stroke-width:3 !important;
+      stroke-dasharray:10 5 !important;
+      filter:drop-shadow(0 0 8px rgba(255,62,45,.72)) !important;
+      cursor:not-allowed !important;
+    }
+    #gameScreen .reward,
+    #gameScreen .trap,
+    #gameScreen .obstacle,
+    #gameScreen .map-item,
+    #gameScreen .score-pop,
+    #gameScreen .effect-pop,
+    #gameScreen .weapon-beam {
+      width:var(--cell-size) !important;
+      height:var(--cell-size) !important;
+    }
+    #gameScreen .side {
+      position:static !important;
+      left:auto !important;
+      bottom:auto !important;
+      width:auto !important;
+      height:auto !important;
+      display:grid !important;
+      gap:14px !important;
+      pointer-events:auto !important;
+    }
+    #gameScreen .side-card,
+    #gameScreen .side-card:first-child {
+      display:block !important;
+      height:auto !important;
+      overflow:visible !important;
+      padding:14px !important;
+      border-radius:12px !important;
+      background:linear-gradient(180deg,rgba(18,24,28,.96),rgba(8,11,13,.94)) !important;
+      border:1px solid rgba(221,164,83,.38) !important;
+      box-shadow:0 20px 50px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.06) !important;
+      backdrop-filter:none !important;
+    }
+    #gameScreen .current-player,
+    #gameScreen .inventory {
+      display:flex !important;
+    }
+    #gameScreen .turn-actions {
+      display:grid !important;
+      grid-template-columns:1fr !important;
+      gap:9px !important;
+      margin-top:14px !important;
+    }
+    #gameScreen .turn-actions .secondary {
+      display:block !important;
+      padding:12px 14px !important;
+      border-radius:14px !important;
+      font-size:inherit !important;
+      min-height:auto !important;
+    }
+    #gameScreen #confirmMove {
+      grid-column:auto !important;
+      min-height:auto !important;
+      padding:15px 18px !important;
+      border-radius:14px !important;
+      font-size:inherit !important;
+    }
+
+    /* Komponenta postav podle dodaných referencí */
+    .role-card[data-role-choice="hunter"] {
+      --character-art:url("assets/characters/hunter.png");
+      --role-glow:#8ecf3d;
+    }
+    .role-card[data-role-choice="cowboy"] {
+      --character-art:url("assets/characters/cowboy.png");
+      --role-glow:#ff8640;
+    }
+    .role-card[data-role-choice="jumper"] {
+      --character-art:url("assets/characters/jumper.png");
+      --role-glow:#22bfff;
+    }
+    .role-card::after {
+      content:"" !important;
+      position:absolute !important;
+      left:50% !important;
+      top:68px !important;
+      translate:-50% 0 !important;
+      width:80% !important;
+      height:66% !important;
+      background:var(--character-art) center bottom / contain no-repeat !important;
+      filter:drop-shadow(0 24px 18px rgba(0,0,0,.68)) drop-shadow(0 0 24px var(--role-glow)) !important;
+      z-index:-1 !important;
+      opacity:1 !important;
+      display:block !important;
+      animation:heroIdle 3.2s ease-in-out infinite !important;
+    }
+    .role-card[data-role-choice="cowboy"]::after {
+      width:72% !important;
+      height:68% !important;
+    }
+    .role-card[data-role-choice="jumper"]::after {
+      width:74% !important;
+      height:70% !important;
+    }
+
+    #gameScreen .piece {
+      position:absolute !important;
+      right:auto !important;
+      bottom:auto !important;
+      width:var(--cell-size) !important;
+      height:var(--cell-size) !important;
+      padding:0 !important;
+      overflow:visible !important;
+      z-index:9 !important;
+      transform:translate(-50%,-50%) !important;
+      transform-origin:center !important;
+      filter:none !important;
+      display:grid !important;
+      place-items:center !important;
+      pointer-events:none !important;
+      transition:none !important;
+    }
+    #gameScreen .piece::before {
+      display:none !important;
+    }
+    #gameScreen .pawn {
+      position:relative !important;
+      left:auto !important;
+      top:auto !important;
+      bottom:auto !important;
+      translate:none !important;
+      width:88% !important;
+      height:88% !important;
+      border:0 !important;
+      border-radius:0 !important;
+      background-color:transparent !important;
+      background-repeat:no-repeat !important;
+      background-position:center center !important;
+      background-size:contain !important;
+      box-shadow:none !important;
+      transform:none !important;
+      z-index:1 !important;
+      display:block !important;
+    }
+    #gameScreen .piece.role-hunter .pawn {
+      background-image:url("assets/characters/hunter.png") !important;
+    }
+    #gameScreen .piece.role-cowboy .pawn {
+      background-image:url("assets/characters/cowboy.png") !important;
+    }
+    #gameScreen .piece.role-jumper .pawn {
+      background-image:url("assets/characters/jumper.png") !important;
+    }
+    #gameScreen .pawn-role {
+      display:none !important;
+    }
+    #gameScreen .piece.active .pawn {
+      transform:none !important;
+      filter:brightness(1.12) saturate(1.08) drop-shadow(0 0 10px var(--player));
+    }
+    #gameScreen .piece.moving .pawn {
+      animation:none !important;
+    }
+    #gameScreen .piece-label {
+      display:none !important;
+    }
+    #gameScreen .piece.shielded::after {
+      inset:9% !important;
+      z-index:2 !important;
+    }
+    #gameScreen #pieces,
+    #gameScreen #rewards,
+    #gameScreen #traps,
+    #gameScreen #obstacles,
+    #gameScreen #items,
+    #gameScreen #scoreEffects {
+      pointer-events:none !important;
+    }
+    #gameScreen #pieces {
+      position:absolute !important;
+      inset:0 !important;
+      width:100% !important;
+      height:100% !important;
+      z-index:8 !important;
+      overflow:visible !important;
+    }
+    #gameScreen .piece.render-error {
+      display:none !important;
+    }
+    #gameScreen .piece-debug {
+      display:none;
+      position:absolute;
+      left:50%;
+      top:-28px;
+      translate:-50% 0;
+      width:max-content;
+      max-width:230px;
+      padding:4px 6px;
+      border-radius:5px;
+      background:rgba(0,0,0,.88);
+      color:#7ff7ff;
+      font:700 9px/1.25 ui-monospace,monospace;
+      white-space:nowrap;
+    }
+    #gameScreen .piece-debug-mode .piece-debug {
+      display:block;
+    }
+    #gameScreen .piece-render-error {
+      position:absolute;
+      left:50%;
+      top:50%;
+      translate:-50% -50%;
+      z-index:30;
+      max-width:80%;
+      padding:12px 16px;
+      border:2px solid #ff5267;
+      border-radius:10px;
+      background:rgba(28,3,7,.94);
+      color:#fff;
+      font-weight:800;
+      text-align:center;
+      pointer-events:none;
+    }
+    #gameScreen .board-wrap.pieces-animating .cell {
+      pointer-events:none !important;
+    }
+    #gameScreen .board {
+      width:100% !important;
+      height:100% !important;
+      overflow:visible !important;
+    }
+    #gameScreen .grid-debug-layer {
+      display:none;
+      pointer-events:none;
+    }
+    #gameScreen .grid-debug .grid-debug-layer {
+      display:block;
+    }
+    #gameScreen .grid-debug .cell {
+      fill:rgba(0,190,255,.08) !important;
+      stroke:#00efff !important;
+      stroke-width:2 !important;
+    }
+    #gameScreen .grid-debug-center circle {
+      fill:#ff334f;
+      stroke:#fff;
+      stroke-width:1;
+      vector-effect:non-scaling-stroke;
+    }
+    #gameScreen .grid-debug-center text {
+      fill:#fff36a;
+      stroke:#101014;
+      stroke-width:3;
+      paint-order:stroke;
+      font:700 13px system-ui,sans-serif;
+    }
+    #gameScreen .grid-calibration-point {
+      fill:#ff38ec;
+      stroke:#180018;
+      stroke-width:1;
+      vector-effect:non-scaling-stroke;
+    }
+    .setup-stage {
+      width:min(920px,100%);
+      margin:auto;
+      padding:clamp(24px,6vw,72px);
+      display:grid;
+      align-content:center;
+      text-align:center;
+    }
+    .setup-card {
+      padding:clamp(22px,4vw,38px);
+      border:1px solid var(--line);
+      border-radius:26px;
+      background:var(--panel);
+      box-shadow:0 30px 80px rgba(0,0,0,.38);
+    }
+    .setup-card h2 { margin:8px 0 10px; font-size:clamp(2rem,5vw,4rem); }
+    .setup-card > p { color:var(--muted); }
+    .selection-summary { margin:22px auto; display:grid; gap:8px; max-width:620px; text-align:left; }
+    .selection-player {
+      display:grid; grid-template-columns:auto 1fr minmax(130px,auto); gap:12px; align-items:center;
+      padding:11px 13px; border:1px solid var(--line); border-radius:14px; background:rgba(255,255,255,.04);
+    }
+    .selection-player.human { border-color:var(--accent); background:rgba(233,255,112,.08); }
+    .selection-player small { color:var(--muted); }
+    .selection-player select { padding:8px 10px; }
+    .preparation-steps { display:grid; gap:10px; max-width:560px; margin:26px auto; text-align:left; }
+    .preparation-step { padding:12px 14px; border-radius:12px; color:var(--muted); background:rgba(255,255,255,.04); }
+    .preparation-step.active { color:#fff; border:1px solid var(--accent); box-shadow:0 0 20px rgba(233,255,112,.14); }
+    .preparation-step.done { color:#8ff0ac; }
+    .ready-roster { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:24px 0; }
+    .ready-player { padding:14px; border:1px solid var(--line); border-radius:14px; background:rgba(255,255,255,.04); }
+    .ready-player strong,.ready-player span { display:block; }
+    .ready-player span { color:var(--accent); margin-top:5px; }
+    .ready-starter { margin:18px 0; padding:14px; border-radius:14px; background:rgba(83,201,255,.1); color:#bcecff; }
+    .setup-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:18px; }
+    .ability-summary {
+      margin:0 0 10px;
+      padding:10px 12px;
+      border:1px solid var(--line);
+      border-radius:12px;
+      background:rgba(255,255,255,.04);
+    }
+    .ability-summary strong { display:block; color:var(--accent); }
+    .ability-summary small { display:block; margin-top:3px; color:var(--muted); line-height:1.35; }
+    body:not([data-game-setup-phase="playing"]) #gameScreen .turn-actions,
+    body:not([data-game-setup-phase="playing"]) #gameScreen #inventory,
+    body:not([data-game-setup-phase="playing"]) #gameScreen .cell {
+      pointer-events:none !important;
+    }
+    @media (max-width:760px) {
+      #gameScreen .game-layout {
+        grid-template-columns:1fr !important;
+      }
+      #gameScreen .board-wrap {
+        width:100% !important;
+      }
+      .selection-player { grid-template-columns:auto 1fr; }
+      .selection-player select { grid-column:1/-1; width:100%; }
+      .setup-actions { grid-template-columns:1fr; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .piece { transition-duration: 1ms; }
+      .piece.moving .pawn, .pulse { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <main id="lobbyScreen" class="screen lobby">
+    <section class="hero">
+      <div class="brand"><span class="brand-mark">O</span> OKRAJOVKA</div>
+      <h1>Sejděte se.<br>Hrajte spolu.</h1>
+      <p class="lead">Rychlá multiplayerová deskovka pro 4–6 hráčů. Založ místnost, pozvi přátele kódem a prázdná místa nech botům.</p>
+      <div class="feature-row">
+        <span class="chip">4–6 hráčů</span>
+        <span class="chip">AI boti</span>
+        <span class="chip">Kód místnosti</span>
+        <span class="chip">Mobil & desktop</span>
+      </div>
+    </section>
+
+    <section class="card" aria-label="Nastavení místnosti">
+      <div class="tabs">
+        <button class="tab active" data-tab="create">Vytvořit</button>
+        <button class="tab" data-tab="join">Připojit se</button>
+      </div>
+      <div id="createPanel">
+        <div class="field"><label for="hostName">Tvoje jméno</label><input id="hostName" value="Lukáš" maxlength="18"></div>
+        <div class="field"><label for="botCount">Počet AI botů</label>
+          <select id="botCount"><option value="3">3 boti</option><option value="4">4 boti</option><option value="5">5 botů</option></select>
+        </div>
+        <div class="room-strip">
+          <div><small>Kód místnosti</small><span id="roomCode" class="room-code">Q7MK</span></div>
+          <button id="copyCode" class="icon-btn" title="Kopírovat kód" aria-label="Kopírovat kód">⧉</button>
+        </div>
+        <div id="roomLinkRow" class="field hidden">
+          <label for="roomLink">Sdílený odkaz</label>
+          <div style="display:flex;gap:8px">
+            <input id="roomLink" readonly>
+            <button id="copyLink" class="icon-btn" title="Kopírovat odkaz" aria-label="Kopírovat odkaz">⧉</button>
+          </div>
+        </div>
+        <p id="onlineStatus" class="hint" aria-live="polite"></p>
+        <div id="lobbyRoster" class="roster"></div>
+        <button id="startGame" class="primary">Vytvořit hru</button>
+        <p id="lobbyHint" class="hint">4 z 6 míst obsazena · můžeš začít</p>
+      </div>
+      <div id="joinPanel" class="hidden">
+        <div class="field"><label for="joinName">Tvoje jméno</label><input id="joinName" placeholder="Např. Ema" maxlength="18"></div>
+        <div class="field"><label for="joinCode">Kód místnosti</label><input id="joinCode" placeholder="ABCD" maxlength="4" style="text-transform:uppercase;letter-spacing:.18em"></div>
+        <button id="joinButton" class="primary" style="margin-top:22px">Připojit se</button>
+        <p class="hint">Demo tě připojí do připravené místnosti</p>
+      </div>
+    </section>
+  </main>
+
+  <main id="roleScreen" class="screen role-screen hidden">
+    <section class="role-intro">
+      <div class="brand" style="justify-content:center"><span class="brand-mark">O</span> OKRAJOVKA</div>
+      <h2>Vyber si roli</h2>
+      <p>Každá postava hraje jinak. Akce se vždy řeší v pořadí Kovboj → Lovec → Jumper.</p>
+    </section>
+    <section class="role-cards" aria-label="Výběr role">
+      <button class="role-card" data-role-choice="hunter">
+        <span class="role-icon">🪤</span><h3>Lovec</h3><p>Kontroluje mapu pomocí skrytých pastí.</p>
+        <ul class="role-points">
+          <li class="plus">Každé kolo položí past kamkoli</li>
+          <li class="plus">Zasažený soupeř stojí 2 kola</li>
+          <li class="plus">Za spuštěnou past získá 15 bodů</li>
+          <li class="plus">Je imunní vůči všem pastem</li>
+          <li class="minus">Pasti zmizí po 2 kolech</li>
+          <li class="minus">Stejné pole nesmí použít dvakrát</li>
+          <li class="minus">Kolo vynechá pouze po zásahu Kovbojem</li>
+          <li class="minus">Štít past úplně zablokuje</li>
+        </ul>
+      </button>
+      <button class="role-card" data-role-choice="cowboy">
+        <span class="role-icon">🤠</span><h3>Kovboj</h3><p>Drží soupeře dál od cenných míst.</p>
+        <ul class="role-points">
+          <li class="plus">Má nekonečně nábojů</li>
+          <li class="plus">Odsune hráče v přímé linii</li>
+          <li class="plus">Hraje první; zásah zruší Jumperův skok</li>
+          <li class="plus">Za úspěšný zásah získá 15 bodů</li>
+          <li class="plus">Výstřelem zničí překážku</li>
+          <li class="minus">Nestřílí skrz překážky</li>
+          <li class="minus">Stejný cíl nelze zasáhnout v tomto ani příštím kole</li>
+        </ul>
+      </button>
+      <button class="role-card" data-role-choice="jumper">
+        <span class="role-icon">✦</span><h3>Jumper</h3><p>Je extrémně pohyblivý, ale zranitelný.</p>
+        <ul class="role-points">
+          <li class="plus">Každé kolo skočí kamkoli</li>
+          <li class="minus">Hraje poslední a může být zastaven před skokem</li>
+          <li class="plus">Snadno dosáhne vzdálených odměn</li>
+          <li class="minus">Nemůže používat štít, past ani pistoli</li>
+          <li class="minus">Po zásahu pistolí vynechá 1 kolo</li>
+        </ul>
+      </button>
+    </section>
+    <section aria-label="Potvrzeni postav protivniku">
+      <h3 style="text-align:center;margin:24px 0 8px">Vybrane postavy</h3>
+      <p class="hint">Tvoje postava je zvyraznena. Postavy protivniku muzes pred pripravou zmenit.</p>
+      <div id="selectionRoster" class="selection-summary"></div>
+    </section>
+    <div class="role-confirm">
+      <div class="setup-actions">
+        <button id="backToLobbyFromSelection" class="secondary">Zp&#283;t do lobby</button>
+        <button id="confirmRole" class="primary">P&#345;ipravit hru</button>
+      </div>
+    </div>
+  </main>
+
+  <main id="preparingScreen" class="screen setup-stage hidden">
+    <section class="setup-card" aria-live="polite">
+      <div class="brand" style="justify-content:center"><span class="brand-mark">O</span> OKRAJOVKA</div>
+      <h2>P&#345;ipravujeme hru</h2>
+      <p id="preparationMessage">P&#345;ipravujeme hern&#237; pole</p>
+      <div id="preparationSteps" class="preparation-steps">
+        <div class="preparation-step" data-preparation-step="board">P&#345;ipravujeme hern&#237; pole</div>
+        <div class="preparation-step" data-preparation-step="players">Rozmis&#357;ujeme postavy</div>
+        <div class="preparation-step" data-preparation-step="rules">Kontrolujeme pravidla</div>
+        <div class="preparation-step" data-preparation-step="ready">Hra je p&#345;ipravena</div>
+      </div>
+    </section>
+  </main>
+
+  <main id="readyScreen" class="screen setup-stage hidden">
+    <section class="setup-card">
+      <div class="brand" style="justify-content:center"><span class="brand-mark">O</span> OKRAJOVKA</div>
+      <h2>Hra je p&#345;ipravena</h2>
+      <p>Postavy jsou rozm&#237;st&#283;n&#233; a hern&#237; stav pro&#353;el kontrolou.</p>
+      <div id="readyRoster" class="ready-roster"></div>
+      <div id="readyStarter" class="ready-starter"></div>
+      <div class="setup-actions">
+        <button id="changePreparedCharacters" class="secondary">Zm&#283;nit postavy</button>
+        <button id="beginPreparedGame" class="primary">Za&#269;&#237;t hru</button>
+      </div>
+    </section>
+  </main>
+
+  <main id="gameScreen" class="screen game hidden">
+    <div class="game-shell">
+      <header class="game-head">
+        <div class="brand"><span class="brand-mark">O</span></div>
+        <h2 class="game-title">Herní mapa</h2>
+        <span class="round-pill">Kolo <b id="roundNumber">1</b>/12</span>
+        <span class="room-pill">Místnost <b id="gameRoom">Q7MK</b></span>
+        <span class="live">hra běží</span>
+      </header>
+      <div class="game-layout">
+        <section class="board-card" aria-label="Herní mapa 10 krát 10">
+          <div id="boardWrap" class="board-wrap">
+            <svg id="board" class="board" viewBox="0 0 1254 1254" preserveAspectRatio="xMidYMid meet" aria-label="Interaktivní herní mřížka 10 krát 10"></svg>
+            <div id="rewards"></div>
+            <div id="traps"></div>
+            <div id="obstacles"></div>
+            <div id="items"></div>
+            <div id="pieces"></div>
+            <div id="scoreEffects"></div>
+            <div id="pieceRenderError" class="piece-render-error hidden" role="alert"></div>
+            <div id="phaseBanner" class="phase-banner"><div id="phaseMessage" class="phase-message">Vyhodnocuji tahy…</div></div>
+          </div>
+        </section>
+        <aside class="side">
+          <section class="side-card">
+            <p class="side-label">Aktivní hráč</p>
+            <div id="currentPlayer" class="current-player"></div>
+            <div id="turnTimer" class="turn-timer hidden"><span>Čas na tah</span><strong>8 s</strong></div>
+            <div id="inventory" class="inventory"></div>
+            <div id="abilitySummary" class="ability-summary hidden"></div>
+            <div class="turn-actions">
+              <button id="trapPower" class="secondary hidden">🪤 Lovecká past</button>
+              <button id="cowboyPower" class="secondary hidden">🔫 Pistole</button>
+              <button id="jumperPower" class="secondary hidden">✦ Skok</button>
+              <button id="confirmMove" class="primary" disabled>Potvrdit tah</button>
+            </div>
+          </section>
+          <section class="side-card">
+            <p class="side-label">Hráči na mapě</p>
+            <div id="miniRoster" class="mini-roster"></div>
+          </section>
+          <section class="side-card">
+            <p class="side-label">Jak se pohybovat</p>
+            <p class="instruction">Sbírej černé díry, žebříky a štíty. Každý předmět nahrazuje běžný pohyb.</p>
+          </section>
+          <section class="side-card">
+            <p class="side-label">Průběh posledního kola</p>
+            <div id="roundRecap" class="round-recap"><span class="waiting-mark">Zatím nebylo odehráno žádné kolo.</span></div>
+          </section>
+        </aside>
+      </div>
+    </div>
+  </main>
+  <div id="toast" class="toast"></div>
+  <div id="initError" class="init-error hidden" role="alertdialog" aria-modal="true" aria-labelledby="initErrorTitle">
+    <div class="init-error-card">
+      <h2 id="initErrorTitle">Hru se nepodařilo připravit</h2>
+      <p id="initErrorMessage">Zkontroluj hráče a zkus inicializaci znovu.</p>
+      <div class="init-error-actions">
+        <button id="retryInitialization" class="primary">Zkusit znovu</button>
+        <button id="returnToLobby" class="secondary">Zpět do lobby</button>
+      </div>
+    </div>
+  </div>
+  <div id="gameOver" class="game-over hidden">
+    <div class="game-over-card">
+      <div class="brand" style="justify-content:center"><span class="brand-mark">O</span> OKRAJOVKA</div>
+      <h2>Máme vítěze!</h2>
+      <p>Na mapě už nezbyla žádná bodová odměna. Je rozhodnuto.</p>
+      <div id="winnerStage" class="winner-stage"></div>
+      <div id="finalAwards" class="awards-grid"></div>
+      <div id="finalRanking" class="final-ranking"></div>
+      <button id="newGame" class="primary">Zpět do lobby</button>
+    </div>
+  </div>
+
+  <script src="board-calibration.js"></script>
+  <script src="board-geometry.js"></script>
+  <script src="game-model.js"></script>
+  <script src="game-rules.js"></script>
+  <script src="game-state.js"></script>
+  <script src="game-session.js"></script>
+  <script src="runtime-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js" crossorigin="anonymous"></script>
+  <script src="online-client.js"></script>
+  <script>
+    const palette2 = ["#ff6b6b", "#5eead4", "#ffd166", "#8b7cff", "#65d46e", "#ff8bd1"];
+    const botNames2 = ["Ada", "Borek", "Cora", "Dex", "Eli"];
+    let gamePlayers = [];
+    let gameState = null;
+    let rewards = [];
+    let traps = [];
+    let obstacles = [];
+    let items = [];
+    let currentRound = 1;
+    let chosenMove = null;
+    let actionMode = "move";
+    let interactionMode = Object.freeze({type:"normal",validTileIds:[]});
+    let lobbyRoles = [];
+    let roundEvents = [];
+    let turnTimerId = null;
+    let turnDeadline = 0;
+    let setupPhase = "character-selection";
+    let preparedSelection = [];
+    let preparationInProgress = false;
+    let onlineSnapshot = null;
+    const PREPARATION_ATTEMPTS = 24;
+    const abilitiesByCharacter = Object.freeze({
+      hunter:Object.freeze({
+        abilityId:"place-trap",
+        buttonId:"trapPower",
+        actionMode:"trap",
+        icon:"🪤",
+        name:"Lovecká past",
+        description:"Položí skrytou past na platné pole podle pravidel Lovce."
+      }),
+      cowboy:Object.freeze({
+        abilityId:"shoot",
+        buttonId:"cowboyPower",
+        actionMode:"weapon",
+        icon:"🔫",
+        name:"Pistole",
+        description:"Vystřelí po přímé linii a odhodí platný cíl."
+      }),
+      jumper:Object.freeze({
+        abilityId:"jump",
+        buttonId:"jumperPower",
+        actionMode:"jump",
+        icon:"✦",
+        name:"Skok kamkoli",
+        description:"Vybere existující cílové pole pro Jumperův skok."
+      })
+    });
+
+    const byId = id => document.getElementById(id);
+    const safe = value => value.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+    const onlineEnabled=()=>Boolean(globalThis.OnlineGame?.configured?.());
+    const localRoomPlayer=()=>onlineEnabled()?OnlineGame.localPlayer():null;
+    const localPlayerId=()=>localRoomPlayer()?.id||gamePlayers[0]?.id||null;
+    const localHuman=()=>gameState?.players?.find(player=>player.id===localPlayerId())||gamePlayers[0]||null;
+    const localIsHost=()=>Boolean(localRoomPlayer()?.is_host);
+
+    function onlineError(error) {
+      const message=error?.message||"Online operace se nezdařila.";
+      const status=byId("onlineStatus");
+      if (status) status.textContent=message;
+      toast(message);
+    }
+
+    function onlineRoomPlayers(detail) {
+      return (detail?.players||[]).map((player,index)=>({
+        id:player.id,name:player.nickname,bot:player.is_bot,role:player.character,
+        character:player.character,color:palette2[index],connected:player.connected,isHost:player.is_host
+      }));
+    }
+
+    function syncOnlineGameState(detail) {
+      onlineSnapshot=detail;
+      if (!detail?.room) return;
+      byId("roomCode").textContent=detail.room.code;
+      byId("gameRoom").textContent=detail.room.code;
+      byId("roomLink").value=OnlineGame.shareUrl();
+      byId("roomLinkRow").classList.remove("hidden");
+      const previousAction=gameState?.lastAction?.at;
+      if (detail.game?.state) {
+        gameState=detail.game.state;
+        gameState.players.forEach(GameState.attachPlayerCompatibilityView);
+        gamePlayers=gameState.players;
+        rewards=gameState.rewards||[];
+        traps=gameState.traps||[];
+        obstacles=gameState.obstacles||[];
+        items=gameState.items||[];
+        currentRound=gameState.round;
+      } else {
+        gamePlayers=onlineRoomPlayers(detail);
+        lobbyRoles=gamePlayers.map(player=>player.role);
+      }
+      refreshLobby();
+      if (detail.room.phase==="lobby") {
+        if (!byId("roleScreen").classList.contains("hidden")) renderCharacterSelection();
+        return;
+      }
+      if (detail.room.phase==="ready") {
+        if (gameState) renderReadyScreen();
+        return;
+      }
+      if (detail.room.phase==="playing"&&gameState) {
+        const firstEntry=setupPhase!=="playing";
+        setSetupPhase("playing");
+        showOnlyScreen("gameScreen");
+        if (firstEntry) buildBoard();
+        else {
+          renderRewards();renderTraps();renderObstacles();renderItems();renderPieces();
+        }
+        if (previousAction!==gameState.lastAction?.at) {
+          const actor=gamePlayers.find(player=>player.id===gameState.lastAction?.playerId);
+          if (actor) showEffect(actor,"TAH SYNCHRONIZOVÁN");
+        }
+        refreshGamePanel();
+        markPossibleMoves();
+        if (humanMayAct()) startTurnTimer(); else stopTurnTimer();
+      }
+      if (detail.room.phase==="finished"||gameState?.finished) {
+        setSetupPhase("finished");
+        renderFinalResults();
+        byId("gameOver").classList.remove("hidden");
+      }
+    }
+    const boardObjectStyle = (x,y,extra="") => {
+      const layout=BoardGeometry.layout(y,x);
+      const left=layout.centerPercent.x-layout.sizePercent/2;
+      const top=layout.centerPercent.y-layout.sizePercent/2;
+      return `--cell-size:${layout.sizePercent}%;left:${left}%;top:${top}%;${extra}`;
+    };
+    const pieceDebugEnabled=new URLSearchParams(globalThis.location?.search||"").get("pieceDebug")==="1";
+
+    function reportPieceRenderError(message) {
+      console.error(`[Vykresleni postavy] ${message}`);
+      const output=byId("pieceRenderError");
+      if (!output) return;
+      output.textContent=`Vyvojarska chyba vykresleni: ${message}`;
+      output.classList.remove("hidden");
+    }
+
+    function getPlayerRenderLayout(player,index) {
+      const position=player?.position;
+      const character=player?.character||player?.role;
+      if (!player?.id || !character || !position ||
+          !Number.isInteger(position.row) || !Number.isInteger(position.column)) {
+        reportPieceRenderError(`Hrac ${player?.id||index} nema platnou postavu nebo pozici.`);
+        return null;
+      }
+      try {
+        const tileId=GameState.tileId(position);
+        const layout=BoardGeometry.layout(position.row,position.column);
+        return {player,index,character,tileId,layout};
+      } catch (error) {
+        reportPieceRenderError(`Hrac ${player.id}: ${error.message}`);
+        return null;
+      }
+    }
+
+    function playerBoardStyle(renderLayout,color) {
+      const {layout}=renderLayout;
+      return `--cell-size:${layout.sizePercent}%;left:${layout.centerPercent.x}%;top:${layout.centerPercent.y}%;--player:${color}`;
+    }
+
+    function updatePieceDebugLabel(element,renderLayout) {
+      if (!element || !renderLayout) return;
+      const {player,character,tileId,layout}=renderLayout;
+      element.dataset.tileId=tileId;
+      const label=element.querySelector(".piece-debug");
+      if (label) label.textContent=`${player.id} | ${character} | ${tileId} | ${layout.center.x.toFixed(1)},${layout.center.y.toFixed(1)}`;
+    }
+    let activePieceAnimations=0;
+
+    function targetBoardCell(column,row) {
+      return document.querySelector(`.cell[data-x="${column}"][data-y="${row}"]`);
+    }
+
+    function setBoardPosition(element,x,y) {
+      if (!element) return;
+      if (element.classList.contains("piece")) {
+        const playerIndex=Number(element.dataset.player);
+        const renderLayout=getPlayerRenderLayout(gamePlayers[playerIndex],playerIndex);
+        if (!renderLayout) {
+          element.classList.add("render-error");
+          return;
+        }
+        element.classList.remove("render-error");
+        const targetLayout=renderLayout.layout;
+        x=targetLayout.column;
+        y=targetLayout.row;
+        const previousColumn=Number(element.dataset.column);
+        const previousRow=Number(element.dataset.row);
+        const hasPrevious=Number.isInteger(previousColumn)&&Number.isInteger(previousRow);
+        const sourceLayout=hasPrevious?BoardGeometry.layout(previousRow,previousColumn):null;
+        const shouldAnimate=!!sourceLayout &&
+          (previousColumn!==x||previousRow!==y) &&
+          element.classList.contains("moving");
+        element.dataset.column=String(x);
+        element.dataset.row=String(y);
+        element.setAttribute("style",playerBoardStyle(renderLayout,element.style.getPropertyValue("--player")||renderLayout.player.color||"currentColor"));
+        updatePieceDebugLabel(element,renderLayout);
+        if (shouldAnimate && typeof element.animate==="function") {
+          const boardRect=byId("boardWrap").getBoundingClientRect();
+          const dx=(sourceLayout.center.x-targetLayout.center.x)/BoardGeometry.imageWidth*boardRect.width;
+          const dy=(sourceLayout.center.y-targetLayout.center.y)/BoardGeometry.imageHeight*boardRect.height;
+          activePieceAnimations++;
+          byId("boardWrap")?.classList.add("pieces-animating");
+          const animation=element.animate(
+            [{translate:`${dx}px ${dy}px`},{translate:"0px 0px"}],
+            {duration:430,easing:"cubic-bezier(.22,.8,.25,1)"}
+          );
+          animation.finished.catch(()=>{}).finally(()=>{
+            activePieceAnimations=Math.max(0,activePieceAnimations-1);
+            if (!activePieceAnimations) byId("boardWrap")?.classList.remove("pieces-animating");
+          });
+        }
+        return;
+      }
+      const targetLayout=BoardGeometry.layout(y,x);
+      element.style.setProperty("--cell-size",`${targetLayout.sizePercent}%`);
+      element.style.left=`${targetLayout.centerPercent.x-targetLayout.sizePercent/2}%`;
+      element.style.top=`${targetLayout.centerPercent.y-targetLayout.sizePercent/2}%`;
+    }
+    function repairBoardPositions() {
+      gamePlayers.forEach((player,index)=>setBoardPosition(document.querySelector(`[data-player="${index}"]`),player.position?.column,player.position?.row));
+      rewards.forEach(reward=>setBoardPosition(document.querySelector(`[data-reward="${reward.id}"]`),reward.x,reward.y));
+      traps.forEach(trap=>setBoardPosition(document.querySelector(`[data-trap="${trap.id}"]`),trap.x,trap.y));
+      obstacles.forEach(obstacle=>setBoardPosition(document.querySelector(`[data-obstacle="${obstacle.id}"]`),obstacle.x,obstacle.y));
+      items.forEach(item=>setBoardPosition(document.querySelector(`[data-item="${item.id}"]`),item.x,item.y));
+    }
+    const randomCode = () => Array.from({length:4}, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random()*32)]).join("");
+    byId("roomCode").textContent = randomCode();
+
+    function refreshLobby() {
+      if (onlineEnabled()&&onlineSnapshot?.room) {
+        gamePlayers=onlineSnapshot.game?.state?.players||onlineRoomPlayers(onlineSnapshot);
+        byId("lobbyRoster").innerHTML=gamePlayers.map((player,index)=>`
+          <div class="player-line" style="--player:${player.color||palette2[index]}">
+            <span class="dot"></span><strong>${safe(player.name||player.nickname)}</strong>
+            <span class="role-badge">${player.character?roleName(player.character):"Bez postavy"}</span>
+            <small>${player.isHost||player.is_host?"Hostitel":player.bot||player.is_bot?"AI bot":player.connected===false?"Odpojen":"Připojen"}</small>
+          </div>`).join("");
+        const host=localIsHost();
+        byId("startGame").textContent=host?"Pokračovat k výběru postavy":"Vybrat postavu";
+        byId("lobbyHint").textContent=`${gamePlayers.length} z 6 míst obsazeno · ${host?"jsi hostitel":"čekáš na hostitele"}`;
+        return;
+      }
+      document.querySelectorAll("[data-role-index]").forEach(select => lobbyRoles[Number(select.dataset.roleIndex)]=select.value);
+      const count = Number(byId("botCount").value);
+      const host = byId("hostName").value.trim() || "Hostitel";
+      gamePlayers = [{name:host,bot:false}, ...botNames2.slice(0,count).map(name => ({name,bot:true}))].map((player,index)=>({
+        ...player,role:lobbyRoles[index]||["hunter","cowboy","jumper"][index%3]
+      }));
+      byId("lobbyRoster").innerHTML = gamePlayers.map((player,index) => `
+        <div class="player-line" style="--player:${palette2[index]}">
+          <span class="dot"></span><strong>${safe(player.name)}</strong>
+          <select class="role-select" data-role-index="${index}" aria-label="Role hráče ${safe(player.name)}">
+            <option value="hunter" ${player.role==="hunter"?"selected":""}>Lovec</option>
+            <option value="cowboy" ${player.role==="cowboy"?"selected":""}>Kovboj</option>
+            <option value="jumper" ${player.role==="jumper"?"selected":""}>Jumper</option>
+          </select>
+        </div>`).join("");
+      document.querySelectorAll("[data-role-index]").forEach(select=>select.addEventListener("change",()=>{
+        lobbyRoles[Number(select.dataset.roleIndex)]=select.value;
+      }));
+      byId("lobbyHint").textContent = `${gamePlayers.length} z 6 míst obsazena · můžeš začít`;
+    }
+
+    async function launchGame() {
+      if (onlineEnabled()) {
+        try {
+          byId("startGame").disabled=true;
+          if (!onlineSnapshot?.room) {
+            const detail=await OnlineGame.createRoom(byId("hostName").value.trim()||"Hostitel",Number(byId("botCount").value));
+            history.replaceState(null,"",`/game/${detail.room.code}`);
+            syncOnlineGameState({...detail,localUserId:OnlineGame.userId});
+          }
+          showRoleSelection();
+        } catch (error) {
+          onlineError(error);
+        } finally {
+          byId("startGame").disabled=false;
+        }
+        return;
+      }
+      refreshLobby();
+      clearInitializationError();
+      showRoleSelection();
+    }
+
+    function showOnlyScreen(screenId) {
+      ["lobbyScreen","roleScreen","preparingScreen","readyScreen","gameScreen"].forEach(id=>
+        byId(id).classList.toggle("hidden",id!==screenId)
+      );
+    }
+
+    function setSetupPhase(nextPhase) {
+      const phases=["character-selection","preparing","ready","playing","finished"];
+      if (!phases.includes(nextPhase)) throw new Error(`Neplatna faze pripravy: ${nextPhase}`);
+      setupPhase=nextPhase;
+      if (document.body) document.body.dataset.gameSetupPhase=nextPhase;
+      if (nextPhase!=="playing") {
+        stopTurnTimer();
+        chosenMove=null;
+        clearTargetHighlights();
+        const confirm=byId("confirmMove");
+        if (confirm) confirm.disabled=true;
+      }
+    }
+
+    function showRoleSelection() {
+      setSetupPhase("character-selection");
+      showOnlyScreen("roleScreen");
+      selectRoleCard((onlineEnabled()?localRoomPlayer()?.character:gamePlayers[0]?.role)||"hunter");
+      renderCharacterSelection();
+    }
+
+    async function selectRoleCard(role) {
+      if (setupPhase!=="character-selection" || !GameState.CHARACTERS.includes(role)) return;
+      if (onlineEnabled()) {
+        try {
+          const detail=await OnlineGame.setCharacter(role);
+          syncOnlineGameState({...detail,localUserId:OnlineGame.userId});
+        } catch (error) {
+          onlineError(error);
+          return;
+        }
+      } else {
+        gamePlayers[0].role=role;
+        lobbyRoles[0]=role;
+      }
+      document.querySelectorAll("[data-role-choice]").forEach(card=>card.classList.toggle("selected",card.dataset.roleChoice===role));
+      const chosenRoleName=byId("chosenRoleName");
+      if (chosenRoleName) chosenRoleName.textContent=roleName(role);
+      renderCharacterSelection();
+    }
+
+    function validateCharacterSelection(players=gamePlayers) {
+      if (!Array.isArray(players) || players.length<4 || players.length>6) {
+        return {valid:false,error:"Vyber 4 az 6 hracu."};
+      }
+      const invalid=players.find(player=>!GameState.CHARACTERS.includes(player?.role||player?.character));
+      if (invalid) return {valid:false,error:"Kazdy hrac musi mit platnou postavu."};
+      if (onlineEnabled()&&!localIsHost()) return {valid:false,error:"Hru připraví hostitel."};
+      return {valid:true,error:""};
+    }
+
+    function renderCharacterSelection() {
+      const output=byId("selectionRoster");
+      if (!output) return;
+      const ownId=localPlayerId();
+      output.innerHTML=gamePlayers.map((player,index)=>{
+        const role=player.role||player.character;
+        if ((!onlineEnabled()&&index===0)||(onlineEnabled()&&player.id===ownId)) return `<div class="selection-player human" style="--player:${palette2[index]}">
+          <span class="dot"></span><div><strong>${safe(player.name)} (Ty)</strong><br><small>Tvoje postava</small></div>
+          <strong>${roleName(role)}</strong></div>`;
+        if (onlineEnabled()) return `<div class="selection-player" style="--player:${palette2[index]}">
+          <span class="dot"></span><div><strong>${safe(player.name)}</strong><br><small>${player.bot?"AI bot":player.connected===false?"Odpojen":"Protihráč"}</small></div>
+          <strong>${role?roleName(role):"Vybírá…"}</strong></div>`;
+        return `<div class="selection-player" style="--player:${palette2[index]}">
+          <span class="dot"></span><div><strong>${safe(player.name)}</strong><br><small>Protivnik ${index}</small></div>
+          <select data-selection-role-index="${index}" aria-label="Postava protivnika ${safe(player.name)}">
+            ${GameState.CHARACTERS.map(character=>`<option value="${character}" ${character===role?"selected":""}>${roleName(character)}</option>`).join("")}
+          </select></div>`;
+      }).join("");
+      output.querySelectorAll("[data-selection-role-index]").forEach(select=>select.addEventListener("change",()=>{
+        const index=Number(select.dataset.selectionRoleIndex);
+        gamePlayers[index].role=select.value;
+        lobbyRoles[index]=select.value;
+        renderCharacterSelection();
+      }));
+      const validation=validateCharacterSelection();
+      byId("confirmRole").disabled=!validation.valid;
+      byId("confirmRole").title=validation.error;
+      byId("confirmRole").textContent=onlineEnabled()?(localIsHost()?"Připravit hru":"Čekání na hostitele"):"Připravit hru";
+    }
+
+    function initializePlayerRuntime(state) {
+      state.players.forEach((player,index)=>Object.assign(player,{
+          color:palette2[index],initial:player.name[0].toUpperCase(),move:null,ready:false,score:0,
+          action:"move",skipRounds:0,
+          shieldActive:false,pendingShield:false,shieldUntilRound:0,
+          inventory:player.character==="jumper"?["obstacle"]:["shield","obstacle"],
+          shotRounds:{},trapPlacements:{},recoveryProtection:{},disabledReason:null,disabledBy:null,
+          stats:{rewards:0,itemsUsed:0,trapsTriggered:0,missedRounds:0,largestReward:0,specialActions:0}
+      }));
+    }
+
+    function validatePreparedSession() {
+      const validation=GameState.validateInitialState(gameState);
+      if (!validation.valid) return validation;
+      const playerFields=new Set(gamePlayers.map(player=>GameState.positionKey(player.position)));
+      const obstacleFields=new Set(obstacles.filter(obstacle=>!obstacle.expired).map(obstacle=>`${obstacle.y}:${obstacle.x}`));
+      if ([...playerFields].some(field=>obstacleFields.has(field))) {
+        return {valid:false,errors:["Postava zacina na prekazce."]};
+      }
+      const occupied=new Set(playerFields);
+      const playable=gamePlayers.every(player=>[[-1,0],[0,1],[1,0],[0,-1]].some(([dr,dc])=>{
+        const position={row:player.position.row+dr,column:player.position.column+dc};
+        const key=GameState.isValidPosition(position)?GameState.positionKey(position):"";
+        return !!key&&!obstacleFields.has(key)&&!occupied.has(key);
+      }));
+      if (!playable) return {valid:false,errors:["Startovni rozmisteni neni hratelne."]};
+      return {valid:true,errors:[]};
+    }
+
+    function createPreparedSession() {
+      let lastError=null;
+      for (let attempt=1;attempt<=PREPARATION_ATTEMPTS;attempt++) {
+        try {
+          gameState=GameState.createPreparedGameState(preparedSelection,{maxAttempts:PREPARATION_ATTEMPTS});
+          gamePlayers=gameState.players;
+          initializePlayerRuntime(gameState);
+          rewards=generateRewards();
+          traps=[];
+          gameState.traps=traps;
+          obstacles=generateStaticObstacles();
+          gameState.obstacles=obstacles;
+          items=generateItems();
+          const validation=validatePreparedSession();
+          if (!validation.valid) throw new Error(validation.errors.join(" "));
+          currentRound=gameState.round;
+          chosenMove=null;
+          actionMode="move";
+          return gameState;
+        } catch (error) {
+          lastError=error;
+          gameState=null;
+          gamePlayers=[];
+          rewards=[];
+          traps=[];
+          obstacles=[];
+          items=[];
+        }
+      }
+      throw new Error(`Hru se nepodarilo pripravit ani po ${PREPARATION_ATTEMPTS} pokusech. ${lastError?.message||""}`.trim());
+    }
+
+    function setPreparationStep(step,message) {
+      byId("preparationMessage").textContent=message;
+      const order=["board","players","rules","ready"];
+      const activeIndex=order.indexOf(step);
+      document.querySelectorAll("[data-preparation-step]").forEach(element=>{
+        const index=order.indexOf(element.dataset.preparationStep);
+        element.classList.toggle("active",index===activeIndex);
+        element.classList.toggle("done",index<activeIndex);
+      });
+    }
+
+    async function prepareGame() {
+      if (onlineEnabled()) {
+        if (!localIsHost()) return toast("Hru může připravit pouze hostitel.");
+        if (preparationInProgress) return;
+        preparationInProgress=true;
+        setSetupPhase("preparing");
+        showOnlyScreen("preparingScreen");
+        try {
+          setPreparationStep("board","Připravujeme herní pole");
+          const detail=await OnlineGame.prepareGame();
+          setPreparationStep("ready","Hra je připravena");
+          syncOnlineGameState({...detail,localUserId:OnlineGame.userId});
+        } catch (error) {
+          setSetupPhase("character-selection");
+          showOnlyScreen("roleScreen");
+          onlineError(error);
+        } finally {
+          preparationInProgress=false;
+        }
+        return;
+      }
+      if (preparationInProgress || !["character-selection","preparing"].includes(setupPhase)) return;
+      const selectionSource=gamePlayers.length?gamePlayers:preparedSelection.map(player=>({...player,role:player.character}));
+      const selectionValidation=validateCharacterSelection(selectionSource);
+      if (!selectionValidation.valid) {
+        toast(selectionValidation.error);
+        renderCharacterSelection();
+        return;
+      }
+      if (gamePlayers.length) {
+        preparedSelection=gamePlayers.map(player=>({name:player.name,bot:player.bot,character:player.role||player.character}));
+      }
+      preparationInProgress=true;
+      byId("confirmRole").disabled=true;
+      setSetupPhase("preparing");
+      showOnlyScreen("preparingScreen");
+      clearInitializationError();
+      try {
+        setPreparationStep("board","Pripravujeme herni pole");
+        await pause(240);
+        setPreparationStep("players","Rozmistujeme postavy");
+        createPreparedSession();
+        await pause(260);
+        setPreparationStep("rules","Kontrolujeme pravidla");
+        const validation=GameState.validateInitialState(gameState);
+        if (!validation.valid) throw new Error(validation.errors.join(" "));
+        await pause(240);
+        setPreparationStep("ready","Hra je pripravena");
+        await pause(220);
+      } catch (error) {
+        gameState=null;
+        preparationInProgress=false;
+        showInitializationError(error instanceof Error?error.message:"Inicializace hry selhala.");
+        return;
+      }
+      preparationInProgress=false;
+      renderReadyScreen();
+    }
+
+    function renderReadyScreen() {
+      setSetupPhase("ready");
+      showOnlyScreen("readyScreen");
+      byId("readyRoster").innerHTML=gamePlayers.map((player,index)=>`<div class="ready-player" style="--player:${player.color}">
+        <strong>${index===0?"Ty - ":""}${safe(player.name)}</strong><span>${roleName(player.character)}</span>
+        <small>Pole ${BoardGeometry.cellLabel(player.position.row,player.position.column)}</small></div>`).join("");
+      const starter=gamePlayers.find(player=>player.id===gameState.activePlayerId);
+      byId("readyStarter").textContent=`Zacina ${starter?.name||"neznamy hrac"} (${roleName(starter?.character||"cowboy")})`;
+      if (onlineEnabled()) {
+        byId("changePreparedCharacters").classList.toggle("hidden",!localIsHost());
+        byId("beginPreparedGame").disabled=!localIsHost();
+        byId("beginPreparedGame").textContent=localIsHost()?"Začít hru":"Čekání na hostitele";
+      }
+    }
+
+    function returnToCharacterSelection() {
+      stopTurnTimer();
+      const source=gamePlayers.length?gamePlayers:preparedSelection;
+      gamePlayers=source.map((player,index)=>({
+        name:player.name,
+        bot:!!player.bot,
+        role:player.character||player.role||lobbyRoles[index]
+      }));
+      lobbyRoles=gamePlayers.map(player=>player.role);
+      gameState=null;
+      rewards=[];
+      traps=[];
+      obstacles=[];
+      items=[];
+      currentRound=1;
+      chosenMove=null;
+      actionMode="move";
+      setSetupPhase("character-selection");
+      clearInitializationError();
+      showRoleSelection();
+    }
+
+    function returnToLobby() {
+      if (onlineEnabled()) {
+        location.href="/";
+        return;
+      }
+      resetGameState();
+      clearInitializationError();
+      byId("gameOver").classList.add("hidden");
+      showOnlyScreen("lobbyScreen");
+      refreshLobby();
+    }
+
+    async function startPreparedGame() {
+      if (onlineEnabled()) {
+        if (!localIsHost()) return toast("Hru může spustit pouze hostitel.");
+        try {
+          byId("beginPreparedGame").disabled=true;
+          const detail=await OnlineGame.activateGame();
+          syncOnlineGameState({...detail,localUserId:OnlineGame.userId});
+        } catch (error) {
+          onlineError(error);
+          byId("beginPreparedGame").disabled=false;
+        }
+        return;
+      }
+      if (setupPhase!=="ready" || !gameState) return;
+      const validation=validatePreparedSession();
+      if (!validation.valid) return showInitializationError(validation.errors.join(" "));
+      setSetupPhase("playing");
+      showOnlyScreen("gameScreen");
+      byId("gameOver").classList.add("hidden");
+      byId("gameRoom").textContent=byId("roomCode").textContent;
+      buildBoard();
+      beginRound();
+    }
+
+    function enterGame() {
+      return prepareGame();
+    }
+
+    function showInitializationError(message) {
+      stopTurnTimer();
+      ["gameScreen","preparingScreen","readyScreen"].forEach(id=>byId(id).classList.add("hidden"));
+      byId("initErrorMessage").textContent=message;
+      byId("initError").classList.remove("hidden");
+    }
+
+    function clearInitializationError() {
+      byId("initError").classList.add("hidden");
+      byId("initErrorMessage").textContent="Zkontroluj hráče a zkus inicializaci znovu.";
+    }
+
+    function resetGameState() {
+      stopTurnTimer();
+      gameState=null;
+      gamePlayers=[];
+      rewards=[];
+      traps=[];
+      obstacles=[];
+      items=[];
+      currentRound=1;
+      chosenMove=null;
+      actionMode="move";
+      lobbyRoles=[];
+      roundEvents=[];
+      setSetupPhase("character-selection");
+      preparedSelection=[];
+      preparationInProgress=false;
+      byId("board").innerHTML="";
+      byId("pieces").innerHTML="";
+      byId("rewards").innerHTML="";
+      byId("traps").innerHTML="";
+      byId("obstacles").innerHTML="";
+      byId("items").innerHTML="";
+      byId("scoreEffects").innerHTML="";
+      byId("roundRecap").innerHTML='<span class="waiting-mark">Zatím nebylo odehráno žádné kolo.</span>';
+    }
+
+    function setGamePhase(phase) {
+      if (gameState) gameState.phase=phase;
+    }
+
+    function setGameRound(round) {
+      currentRound=round;
+      if (gameState) gameState.round=round;
+    }
+
+    function buildBoard() {
+      const cells=Array.from({length:100},(_,index) => {
+        const x=index%10,y=Math.floor(index/10);
+        return `<polygon class="cell ${(x+y)%2?"alt":""}" data-x="${x}" data-y="${y}"
+          points="${BoardGeometry.polygonPoints(y,x)}" tabindex="0" role="button"
+          aria-label="Pole ${BoardGeometry.cellLabel(y,x)}"></polygon>`;
+      }).join("");
+      const debugCenters=Array.from({length:100},(_,index)=>{
+        const x=index%10,y=Math.floor(index/10);
+        const center=BoardGeometry.center(y,x);
+        return `<g class="grid-debug-center">
+          <circle cx="${center.x}" cy="${center.y}" r="4"></circle>
+          <text x="${center.x+7}" y="${center.y-7}">${BoardGeometry.cellLabel(y,x)}</text>
+        </g>`;
+      }).join("");
+      const debugPoints=BoardCalibration.intersections.flat().map(point=>
+        `<circle class="grid-calibration-point" cx="${point.x}" cy="${point.y}" r="3"></circle>`
+      ).join("");
+      byId("board").innerHTML=`${cells}<g class="grid-debug-layer">${debugCenters}${debugPoints}</g>`;
+      const debugEnabled=new URLSearchParams(globalThis.location?.search||"").get("gridDebug")==="1";
+      byId("boardWrap").classList.toggle("grid-debug",debugEnabled);
+      byId("boardWrap").classList.toggle("piece-debug-mode",pieceDebugEnabled);
+      byId("pieceRenderError").classList.add("hidden");
+      byId("pieceRenderError").textContent="";
+      byId("pieces").innerHTML=gamePlayers.map((player,index) => {
+        const renderLayout=getPlayerRenderLayout(player,index);
+        if (!renderLayout) return "";
+        const {layout,tileId,character}=renderLayout;
+        return `
+          <div class="piece role-${character} ${index===0?"active":""}" data-player="${index}" data-tile-id="${tileId}" data-column="${layout.column}" data-row="${layout.row}" style="${playerBoardStyle(renderLayout,player.color)}">
+            <div class="pawn"><span class="pawn-role">${roleIcon(character)}</span></div>
+            <span class="piece-label">${safe(player.name)}</span>
+            <span class="piece-debug">${player.id} | ${character} | ${tileId} | ${layout.center.x.toFixed(1)},${layout.center.y.toFixed(1)}</span>
+          </div>`;
+      }).join("");
+      setTimeout(()=>{
+        const overlay=byId("pieces");
+        const bounds=overlay?.getBoundingClientRect();
+        if (!bounds || bounds.width<=0 || bounds.height<=0) {
+          reportPieceRenderError("Vrstva postav nema platnou sirku nebo vysku.");
+          return;
+        }
+        if (pieceDebugEnabled) {
+          console.table(gamePlayers.map((player,index)=>{
+            const renderLayout=getPlayerRenderLayout(player,index);
+            return renderLayout?{
+              playerId:player.id,
+              character:renderLayout.character,
+              tileId:renderLayout.tileId,
+              center:`${renderLayout.layout.center.x}, ${renderLayout.layout.center.y}`,
+              overlay:`${Math.round(bounds.width)} x ${Math.round(bounds.height)}`
+            }:null;
+          }).filter(Boolean));
+        }
+      },0);
+      renderRewards();
+      renderTraps();
+      renderObstacles();
+      renderItems();
+      repairBoardPositions();
+      refreshGamePanel();
+    }
+
+    function generateRewards() {
+      const definitions=[
+        ...Array(7).fill(null).map(() => ({value:5,unlockRound:1})),
+        ...Array(4).fill(null).map(() => ({value:15,unlockRound:1})),
+        {value:15,unlockRound:3},
+        {value:15,unlockRound:6},
+        {value:50,unlockRound:4},
+        {value:50,unlockRound:8},
+        {value:15,unlockRound:4},
+        {value:15,unlockRound:10}
+      ];
+      const occupied=new Set(gamePlayers.map(player => `${player.position.column}:${player.position.row}`));
+      return definitions.map((definition,index) => {
+        let x,y,key;
+        do {
+          x=1+Math.floor(Math.random()*8);
+          y=1+Math.floor(Math.random()*8);
+          key=`${x}:${y}`;
+        } while (occupied.has(key));
+        occupied.add(key);
+        return {id:index,x,y,...definition,collected:false,unlocked:definition.unlockRound===1};
+      });
+    }
+
+    const itemInfo={
+      teleport:{name:"Černá díra",icon:"🕳️",color:"#8b7cff"},
+      ladder:{name:"Žebřík",icon:"🪜",color:"#ffd166"},
+      shield:{name:"Štít",icon:"🛡️",color:"#77ddff"},
+      obstacle:{name:"Překážka",icon:"🪨",color:"#9ca3af"}
+    };
+
+    function generateItems() {
+      const types=["teleport","teleport","teleport","teleport","teleport","teleport","ladder","ladder","ladder","shield","shield","shield","shield"];
+      const occupied=new Set([...gamePlayers.map(player=>`${player.position.column}:${player.position.row}`),...rewards.map(r=>`${r.x}:${r.y}`),...obstacles.map(o=>`${o.x}:${o.y}`)]);
+      return types.map((type,id)=>{
+        let x,y,key;
+        do { x=1+Math.floor(Math.random()*8); y=1+Math.floor(Math.random()*8); key=`${x}:${y}`; }
+        while(occupied.has(key));
+        occupied.add(key);
+        return {id,type,x,y,collected:false};
+      });
+    }
+
+    function generateStaticObstacles() {
+      const occupied=new Set([...gamePlayers.map(player=>`${player.position.column}:${player.position.row}`),...rewards.map(reward=>`${reward.x}:${reward.y}`)]);
+      const result=[];
+      while(result.length<8) {
+        const x=1+Math.floor(Math.random()*8),y=1+Math.floor(Math.random()*8),key=`${x}:${y}`;
+        if(occupied.has(key)) continue;
+        occupied.add(key);
+        result.push({id:`rock-${result.length}`,x,y,expired:false,expiresRound:Infinity});
+      }
+      return result;
+    }
+
+    function renderItems() {
+      byId("items").innerHTML=items.filter(item=>!item.collected).map(item=>{
+        const info=itemInfo[item.type];
+        return `<div class="map-item ${item.type}" data-item="${item.id}" style="${boardObjectStyle(item.x,item.y,"--item:"+info.color)}">
+          <div class="map-item-token" title="${info.name}"><span>${info.icon}</span></div>
+        </div>`;
+      }).join("");
+    }
+
+    function renderRewards() {
+      byId("rewards").innerHTML=rewards.filter(reward => !reward.collected).map(reward => {
+        const size=reward.value===5?"38%":reward.value===15?"55%":reward.value===50?"76%":"88%";
+        const color=reward.value===5?"#5eead4":reward.value===15?"#ffd166":reward.value===50?"#ff8bd1":"#e9ff70";
+        return `<div class="reward ${reward.unlocked?"":"locked"}" data-reward="${reward.id}" style="${boardObjectStyle(reward.x,reward.y,"--size:"+size+";--reward:"+color)}">
+          <div class="reward-gem" title="${reward.value} bodů · ${reward.unlocked?"odemčeno":`otevře se v kole ${reward.unlockRound}`}"><span>${reward.value}</span></div>
+          ${reward.unlocked?"":`<div class="reward-lock">🔒 za ${Math.max(1,reward.unlockRound-currentRound)} kol</div>`}
+        </div>`;
+      }).join("");
+    }
+
+    function renderTraps() {
+      byId("traps").innerHTML=traps.filter(trap => !trap.used && (!trap.expiresRound||currentRound<trap.expiresRound)).map(trap => {
+        const ownTrap=onlineEnabled()?trap.ownerId===localPlayerId():trap.owner===0;
+        const visible=ownTrap || trap.revealed;
+        return `<div class="trap ${visible?"":"hidden-trap"} ${ownTrap?"own-trap":""}" data-trap="${trap.id}" style="${boardObjectStyle(trap.x,trap.y)}">
+          <div class="trap-mark"><span>🪤</span></div>
+        </div>`;
+      }).join("");
+    }
+
+    function renderObstacles() {
+      byId("obstacles").innerHTML=obstacles.filter(obstacle => !obstacle.expired).map(obstacle => `
+        <div class="obstacle" data-obstacle="${obstacle.id}" style="${boardObjectStyle(obstacle.x,obstacle.y)}">
+          <div class="obstacle-stone"></div>
+        </div>`).join("");
+    }
+
+    function cardinalDirections() {
+      return [[0,-1],[1,0],[0,1],[-1,0]];
+    }
+
+    function adjacentTiles(position) {
+      return cardinalDirections().map(([dx,dy]) => ({x:position.x+dx,y:position.y+dy}));
+    }
+
+    function stepInDirection(position,directionIndex) {
+      const [dx,dy]=cardinalDirections()[directionIndex];
+      return {x:position.x+dx,y:position.y+dy};
+    }
+
+    function gridDistance(a,b) {
+      return Math.abs(a.x-b.x)+Math.abs(a.y-b.y);
+    }
+
+    function possibleMoves(player, extraObstacle=null) {
+      return adjacentTiles(player)
+        .filter(({x,y}) => x>=0 && x<10 && y>=0 && y<10)
+        .filter(({x,y}) => !obstacles.some(obstacle => !obstacle.expired && obstacle.x===x && obstacle.y===y))
+        .filter(({x,y}) => !extraObstacle || extraObstacle.x!==x || extraObstacle.y!==y);
+    }
+
+    function canPlaceObstacle(position) {
+      if (obstacles.some(obstacle => !obstacle.expired && obstacle.x===position.x && obstacle.y===position.y)) return false;
+      if (gamePlayers.some(player => player.x===position.x && player.y===position.y)) return false;
+      return gamePlayers.every(player => possibleMoves(player,position).length>0);
+    }
+
+    function activePlayerIndex() {
+      return gamePlayers.findIndex(player=>player.id===gameState?.activePlayerId);
+    }
+
+    function activePlayer() {
+      const index=activePlayerIndex();
+      return index>=0?gamePlayers[index]:null;
+    }
+
+    function humanMayAct() {
+      const human=localHuman();
+      return setupPhase==="playing" && !!human && gameState?.activePlayerId===human.id &&
+        gameState.phase==="planning" && !gameState.isResolvingTurn;
+    }
+
+    function humanPlayerFromState() {
+      const humanId=localPlayerId();
+      return gameState?.players?.find(player=>player.id===humanId)||null;
+    }
+
+    function clearTargetHighlights() {
+      resetInteractionMode();
+      document.querySelectorAll(".cell").forEach(cell=>{
+        cell.classList.remove("reachable","selected","trap-target","ability-invalid");
+        cell.removeAttribute("aria-disabled");
+        cell.removeAttribute("data-ability-target");
+        cell.removeAttribute("data-invalid-reason");
+        cell.removeAttribute("title");
+      });
+    }
+
+    function setInteractionMode(type,targetMap=[]) {
+      interactionMode=Object.freeze({
+        type,
+        validTileIds:Object.freeze(targetMap.filter(target=>target.valid).map(target=>target.tileId))
+      });
+    }
+
+    function resetInteractionMode() {
+      interactionMode=Object.freeze({type:"normal",validTileIds:[]});
+    }
+
+    function cancelAbilitySelection() {
+      if (!["selecting-trap-target","selecting-jump-target"].includes(interactionMode.type)) return false;
+      const human=humanPlayerFromState();
+      actionMode="move";
+      chosenMove=null;
+      if (human) {
+        human.action="move";
+        human.move=null;
+        human.itemIndex=undefined;
+      }
+      resetInteractionMode();
+      clearTargetHighlights();
+      markPossibleMoves();
+      refreshGamePanel();
+      return true;
+    }
+
+    function abilityUnavailableReason(currentPlayer,available) {
+      if (setupPhase!=="playing") return "Schopnost je dostupná pouze během hry.";
+      if (!currentPlayer) return "Hráč není v herním stavu.";
+      if (gameState?.activePlayerId!==currentPlayer.id) return "Počkej na svůj tah.";
+      if (gameState?.phase!=="planning"||gameState?.isResolvingTurn) return "Tah se právě vyhodnocuje.";
+      if (currentPlayer.skipRounds>0) return `Postava vynechává ${currentPlayer.skipRounds} tah.`;
+      if (!available) return "Schopnost už nyní nelze použít.";
+      return "Schopnost je připravena.";
+    }
+
+    function renderCharacterAbility(currentPlayer) {
+      const character=currentPlayer?.character;
+      const ability=abilitiesByCharacter[character];
+      Object.values(abilitiesByCharacter).forEach(config=>{
+        const button=byId(config.buttonId);
+        button.classList.add("hidden");
+        button.classList.remove("active");
+        button.disabled=true;
+      });
+      const summary=byId("abilitySummary");
+      if (!ability || setupPhase!=="playing") {
+        summary.classList.add("hidden");
+        summary.innerHTML="";
+        return;
+      }
+      const available=GameState.getAvailableAbilities(gameState,currentPlayer.id)
+        .some(candidate=>candidate.id===ability.abilityId);
+      const status=abilityUnavailableReason(currentPlayer,available);
+      const button=byId(ability.buttonId);
+      const active=actionMode===ability.actionMode;
+      button.classList.remove("hidden");
+      button.classList.toggle("active",active);
+      button.classList.toggle("unavailable",!available);
+      button.disabled=currentPlayer.ready||!humanMayAct()||!available;
+      button.textContent=active?`× Zrušit: ${ability.name}`:`${ability.icon} ${ability.name}`;
+      button.title=`${ability.description} ${status}`;
+      button.setAttribute("aria-label",`${ability.name}. ${status}`);
+      button.dataset.abilityState=active?"active":available?"available":"unavailable";
+      summary.classList.remove("hidden");
+      summary.innerHTML=`<strong>${ability.icon} ${ability.name}</strong><small>${ability.description}<br>${status}</small>`;
+    }
+
+    function markPossibleMoves() {
+      clearTargetHighlights();
+      const human=localHuman();
+      if (!humanMayAct() || human.ready) return;
+      if (human.skipRounds>0 && actionMode!=="shield") return;
+      const abilityTargets=abilityId=>GameState.getAbilityTargets(gameState,human.id,abilityId)
+        .map(target=>({x:target.column,y:target.row,...target}));
+      const selectedAbilityId=actionMode==="jump"?"jump":
+        actionMode==="trap"&&human.character==="hunter"?"place-trap":null;
+      const abilityTargetMap=selectedAbilityId
+        ? GameState.getAbilityTargetMap(gameState,human.id,selectedAbilityId)
+        : [];
+      const targets=actionMode==="teleport"?teleportTargets(human):
+        actionMode==="jump"?abilityTargetMap.filter(target=>target.valid).map(target=>({x:target.column,y:target.row,...target})):
+        actionMode==="ladder"?ladderTargets(human):
+        actionMode==="weapon"?abilityTargets("shoot"):
+        actionMode==="trap"&&human.character==="hunter"?abilityTargetMap.filter(target=>target.valid).map(target=>({x:target.column,y:target.row,...target})):
+        actionMode==="trap"?trapTargets(human):
+        actionMode==="obstacle"?trapTargets(human).filter(canPlaceObstacle):
+        GameState.getValidMoves(gameState,human.id).map(move=>({x:move.column,y:move.row}));
+      const abilityTargetMode=actionMode==="jump"||
+        (actionMode==="trap"&&human.character==="hunter");
+      if (abilityTargetMode) {
+        setInteractionMode(
+          actionMode==="jump"?"selecting-jump-target":"selecting-trap-target",
+          abilityTargetMap
+        );
+        abilityTargetMap.forEach(target=>{
+          const cell=document.querySelector(`.cell[data-x="${target.column}"][data-y="${target.row}"]`);
+          if (!target.valid && cell) {
+            cell.classList.add("ability-invalid");
+            cell.setAttribute("aria-disabled","true");
+            cell.dataset.abilityTarget="invalid";
+            cell.dataset.invalidReason=target.reason;
+            cell.title=`Neplatný cíl: ${target.reason}.`;
+          }
+        });
+      } else {
+        resetInteractionMode();
+      }
+      targets.forEach(({x,y}) => {
+        const cell=document.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`);
+        cell?.classList.add("reachable");
+        if (abilityTargetMode && cell) {
+          cell.setAttribute("aria-disabled","false");
+          cell.dataset.abilityTarget="valid";
+          cell.title="Platný cíl schopnosti.";
+        }
+        if (actionMode==="trap" || actionMode==="obstacle") cell?.classList.add("trap-target");
+        cell?.classList.remove("ability-invalid");
+        if (actionMode==="obstacle" && !canPlaceObstacle({x,y})) cell?.classList.remove("reachable","trap-target");
+      });
+      if (chosenMove) {
+        const selected=document.querySelector(`.cell.reachable[data-x="${chosenMove.x}"][data-y="${chosenMove.y}"]`);
+        selected?.classList.add("selected");
+      }
+    }
+
+    function refreshGamePanel() {
+      const human=humanPlayerFromState()||gamePlayers[0];
+      const current=activePlayer()||human;
+      const currentIndex=activePlayerIndex();
+      repairBoardPositions();
+      byId("roundNumber").textContent=currentRound;
+      byId("currentPlayer").style.setProperty("--player",current.color);
+      byId("currentPlayer").innerHTML=`
+        <span class="current-token" style="--player:${current.color}"></span>
+        <div><strong>${safe(current.name)}</strong><br><small>${current.bot?"AI právě volí tah":gameState?.isResolvingTurn?"Tah se vyhodnocuje":chosenMove?`Vybráno pole ${chosenMove.x+1}, ${chosenMove.y+1}`:"Vyber sousední pole"}</small></div>`;
+      byId("miniRoster").innerHTML=gamePlayers.map((player,index) => `
+        <div class="mini-player ${index===currentIndex?"turn":""}">
+          <span class="dot" style="--player:${player.color}"></span>
+          <span class="player-meta"><span>${safe(player.name)} <small class="role-badge">${roleName(player.character)}</small></span><span class="player-score">${formatScore(player.score)} b.</span></span>
+          <span class="${player.ready?"ready-mark":"waiting-mark"}">${player.ready?"✓":"…"}</span>
+        </div>`).join("");
+      byId("inventory").innerHTML=human.inventory.length
+        ? human.inventory.map((type,index)=>`<button class="item-button ${type} ${actionMode===type&&human.itemIndex===index?"active":""}" style="border-color:${itemInfo[type].color};color:${itemInfo[type].color}" data-use-item="${index}" ${human.ready||!humanMayAct()||(human.skipRounds>0&&type!=="shield")?"disabled":""}>${itemInfo[type].icon} ${itemInfo[type].name}</button>`).join("")
+        : `<span class="waiting-mark">Inventář 0/8</span>`;
+      renderCharacterAbility(human);
+      byId("confirmMove").disabled=!chosenMove || human.ready || !humanMayAct() || activePieceAnimations>0;
+      byId("confirmMove").textContent=actionMode==="trap"?"Potvrdit položení pasti":
+        actionMode==="obstacle"?"Potvrdit překážku":
+        actionMode==="teleport"?"Potvrdit teleport":
+        actionMode==="ladder"?"Použít žebřík":
+        actionMode==="weapon"?"Potvrdit výstřel":
+        actionMode==="obstacle"?"Položit překážku":
+        actionMode==="shield"?"Aktivovat štít":"Potvrdit tah";
+      document.querySelectorAll(".piece").forEach(piece => {
+        const index=Number(piece.dataset.player);
+        piece.classList.toggle("active",index===currentIndex && gameState?.phase==="planning");
+        piece.classList.toggle("shielded",!!gamePlayers[index]?.shieldActive);
+      });
+      byId("inventory").querySelectorAll("[data-use-item]").forEach(button => button.addEventListener("click",()=>useItem(Number(button.dataset.useItem))));
+    }
+
+    function roleName(role) {
+      return role==="hunter"?"Lovec":role==="cowboy"?"Kovboj":"Jumper";
+    }
+
+    function roleIcon(role) {
+      return role==="hunter"?"🏹":role==="cowboy"?"🤠":"🦘";
+    }
+
+    function selectReachableCell(cell) {
+      if (!humanMayAct() || activePieceAnimations>0) return;
+      if (cell.dataset.abilityTarget==="invalid") return;
+      const tileId=GameState.tileId({row:Number(cell.dataset.y),column:Number(cell.dataset.x)});
+      if (interactionMode.type!=="normal"&&!interactionMode.validTileIds.includes(tileId)) return;
+      const target={x:Number(cell.dataset.x),y:Number(cell.dataset.y)};
+      const human=localHuman();
+      if (actionMode==="move") {
+        const valid=GameState.getValidMoves(gameState,human.id)
+          .some(move=>move.column===target.x&&move.row===target.y);
+        if (!valid) return;
+      }
+      document.querySelectorAll(".cell.selected").forEach(item => item.classList.remove("selected"));
+      cell.classList.add("selected");
+      chosenMove=target;
+      human.move=chosenMove;
+      human.action=actionMode;
+      if (actionMode==="weapon") {
+        const target=GameState.getAbilityTargets(gameState,human.id,"shoot")
+          .find(candidate=>candidate.column===chosenMove.x&&candidate.row===chosenMove.y);
+        human.weaponTargetIndex=target?.targetIndex;
+        human.weaponTargetId=target?.targetPlayerId;
+        human.weaponObstacleId=target?.obstacleId;
+      }
+      byId("confirmMove").disabled=false;
+      refreshGamePanel();
+      if (actionMode==="trap" && humanPlayerFromState()?.character==="hunter") {
+        confirmMove();
+      }
+      if (actionMode==="jump" && humanPlayerFromState()?.character==="jumper") {
+        confirmMove();
+      }
+    }
+
+    function selectCell(event) {
+      if (activePieceAnimations>0) return;
+      const cell=event.target.closest(".cell");
+      if (!cell || !humanMayAct() || localHuman().ready || !cell.classList.contains("reachable")) return;
+      selectReachableCell(cell);
+    }
+
+    async function beginRound() {
+      stopTurnTimer();
+      setGamePhase("planning");
+      gameState.isResolvingTurn=false;
+      gameState.activePlayerId=gameState.turnOrder[0];
+      gameState.turnIndex=0;
+      chosenMove=null;
+      actionMode="move";
+      gamePlayers.forEach(player => {
+        player.move=null;
+        player.ready=false;
+        player.action="move";
+        player.itemIndex=undefined;
+        if (player.shieldActive && currentRound>=player.shieldUntilRound) {
+          player.shieldActive=false;
+          player.shieldUntilRound=0;
+        }
+        Object.keys(player.recoveryProtection||{}).forEach(attacker => {
+          if (player.recoveryProtection[attacker]<currentRound) delete player.recoveryProtection[attacker];
+        });
+      });
+      byId("phaseBanner").classList.remove("show");
+      renderRewards();
+      renderTraps();
+      renderObstacles();
+      renderItems();
+      await startActiveTurn();
+    }
+
+    async function startActiveTurn() {
+      stopTurnTimer();
+      setGamePhase("planning");
+      gameState.isResolvingTurn=false;
+      chosenMove=null;
+      actionMode="move";
+      clearTargetHighlights();
+      const player=activePlayer();
+      const index=activePlayerIndex();
+      if (!player) return showInitializationError("Aktivní hráč neexistuje.");
+      player.ready=false;
+      player.move=null;
+      player.action="move";
+      player.itemIndex=undefined;
+      markPossibleMoves();
+      refreshGamePanel();
+      if (player.skipRounds>0) {
+        player.skipRounds--;
+        player.stats.missedRounds++;
+        player.action="skip";
+        player.move={x:player.x,y:player.y};
+        setTimeout(()=>resolveActiveTurn(),350);
+        return;
+      }
+      if (player.bot) {
+        const plan=planBotTurn(player,index);
+        player.action=plan.action;
+        player.move=plan.move;
+        if (plan.itemIndex!==undefined) player.itemIndex=plan.itemIndex;
+        if (plan.targetIndex!==undefined) player.weaponTargetIndex=plan.targetIndex;
+        if (plan.targetPlayerId!==undefined) player.weaponTargetId=plan.targetPlayerId;
+        if (plan.obstacleId!==undefined) player.weaponObstacleId=plan.obstacleId;
+        if (plan.consumeItem) { player.inventory.splice(plan.itemIndex,1); player.stats.itemsUsed++; }
+        if (player.action==="shield") player.pendingShield=true;
+        refreshGamePanel();
+        setTimeout(()=>resolveActiveTurn(),520);
+        return;
+      }
+      const normalMoves=GameState.getValidMoves(gameState,player.id);
+      if (!normalMoves.length) showEffect(player,"ŽÁDNÝ BĚŽNÝ TAH · LZE POUŽÍT SCHOPNOST");
+      startTurnTimer();
+    }
+
+    function planBotTurn(bot,index) {
+      if (bot.skipRounds>0) {
+        const shieldIndex=bot.inventory.indexOf("shield");
+        if (shieldIndex>=0) return {action:"shield",move:{x:bot.x,y:bot.y},itemIndex:shieldIndex,consumeItem:true};
+        return {action:"skip",move:{x:bot.x,y:bot.y}};
+      }
+      const options=GameState.getValidMoves(gameState,bot.id).map(move=>({x:move.column,y:move.row}));
+      if (bot.role==="jumper") {
+        const targets=GameState.getAbilityTargets(gameState,bot.id,"jump").map(target=>({x:target.column,y:target.row}));
+        return {action:"jump",move:bestBotPosition(bot,targets,index)};
+      }
+      if (bot.role==="cowboy") {
+        const targets=GameState.getAbilityTargets(gameState,bot.id,"shoot").map(target=>({
+          x:target.column,y:target.row,targetIndex:target.targetIndex,targetPlayerId:target.targetPlayerId,obstacleId:target.obstacleId
+        }));
+        const playerTarget=targets.filter(target=>target.targetIndex!==undefined)
+          .sort((a,b)=>gamePlayers[b.targetIndex].score-gamePlayers[a.targetIndex].score)[0];
+        const obstacleTarget=targets.find(target=>target.obstacleId);
+        const target=playerTarget||obstacleTarget;
+        if (target) return {action:"weapon",move:target,targetIndex:target.targetIndex,obstacleId:target.obstacleId};
+      }
+      if (!options.length) return {action:"wait",move:{x:bot.x,y:bot.y}};
+      const knownDanger=traps.filter(trap=>!trap.used && (trap.owner===index || trap.revealed));
+      const nearbyDanger=knownDanger.some(trap=>gridDistance(trap,bot)<=2);
+      const opponents=gamePlayers.filter((player,playerIndex)=>playerIndex!==index);
+      const nearestOpponent=[...opponents].sort((a,b)=>distance(bot,a)-distance(bot,b))[0];
+      const lockedPrize=rewards
+        .filter(reward=>!reward.collected&&!reward.unlocked&&reward.value>=50)
+        .sort((a,b)=>botRewardUtility(bot,b)-botRewardUtility(bot,a))[0];
+
+      if (lockedPrize && distance(bot,lockedPrize)===0 && lockedPrize.unlockRound-currentRound<=2) {
+        return {action:"wait",move:{x:bot.x,y:bot.y}};
+      }
+
+      const shieldIndex=bot.inventory.indexOf("shield");
+      if (nearbyDanger && shieldIndex>=0 && !bot.shieldActive) {
+        return {action:"shield",move:{x:bot.x,y:bot.y},itemIndex:shieldIndex,consumeItem:true};
+      }
+
+      const teleportIndex=bot.inventory.indexOf("teleport");
+      if (teleportIndex>=0) {
+        const targets=teleportTargets(bot);
+        const best=bestBotPosition(bot,targets,index);
+        if (best && positionScore(bot,best,index)-positionScore(bot,{x:bot.x,y:bot.y},index)>18) {
+          return {action:"teleport",move:best,itemIndex:teleportIndex};
+        }
+      }
+
+      const ladderIndex=bot.inventory.indexOf("ladder");
+      if (ladderIndex>=0) {
+        const targets=ladderTargets(bot);
+        const best=bestBotPosition(bot,targets,index);
+        if (best && positionScore(bot,best,index)>positionScore(bot,options[0],index)+10) {
+          return {action:"ladder",move:best,itemIndex:ladderIndex};
+        }
+      }
+
+      if (bot.role==="hunter" && nearestOpponent) {
+        const trapCell=GameState.getAbilityTargets(gameState,bot.id,"place-trap")
+          .map(target=>({x:target.column,y:target.row}))
+          .filter(move=>!traps.some(trap=>!trap.used&&trap.x===move.x&&trap.y===move.y))
+          .sort((a,b)=>distance(a,nearestOpponent)-distance(b,nearestOpponent))[0];
+        if (trapCell) return {action:"trap",move:trapCell};
+      }
+
+      const obstacleCell=options
+        .filter(canPlaceObstacle)
+        .filter(move=>opponents.some(player=>distance(move,player)<=2))
+        .sort((a,b)=>botObstacleValue(b,index)-botObstacleValue(a,index))[0];
+      if (obstacleCell && botObstacleValue(obstacleCell,index)>10) {
+        return {action:"obstacle",move:obstacleCell};
+      }
+
+      return {action:"move",move:bestBotPosition(bot,options,index)};
+    }
+
+    function distance(a,b) {
+      return gridDistance(a,b);
+    }
+
+    function botRewardUtility(bot,reward) {
+      const roundsUntil=Math.max(0,reward.unlockRound-currentRound);
+      const travel=distance(bot,reward);
+      const timingPenalty=roundsUntil>travel ? (roundsUntil-travel)*3 : 0;
+      const closeSmallBonus=reward.value===5&&travel<=2 ? 9 : 0;
+      return reward.value/(travel+1)+closeSmallBonus-timingPenalty;
+    }
+
+    function positionScore(bot,position,index) {
+      let score=0;
+      rewards.filter(reward=>!reward.collected).forEach(reward=>{
+        const futureBot={...bot,x:position.x,y:position.y};
+        score=Math.max(score,botRewardUtility(futureBot,reward));
+        if (reward.x===position.x&&reward.y===position.y&&reward.unlocked) score+=reward.value*.7;
+      });
+      items.filter(item=>!item.collected).forEach(item=>{
+        const d=distance(position,item);
+        if (bot.inventory.length<3) score=Math.max(score,14/(d+1)+(d===0?12:0));
+      });
+      traps.filter(trap=>!trap.used&&(trap.owner===index||trap.revealed)).forEach(trap=>{
+        if (trap.x===position.x&&trap.y===position.y&&trap.owner!==index) score-=120;
+        else if (distance(position,trap)===1&&trap.owner!==index) score-=8;
+      });
+      const crowd=gamePlayers.filter((player,playerIndex)=>playerIndex!==index&&player.x===position.x&&player.y===position.y).length;
+      score-=crowd*2;
+      return score;
+    }
+
+    function bestBotPosition(bot,positions,index) {
+      return [...positions].sort((a,b)=>positionScore(bot,b,index)-positionScore(bot,a,index))[0] || {x:bot.x,y:bot.y};
+    }
+
+    function botObstacleValue(position,index) {
+      const opponents=gamePlayers.filter((player,playerIndex)=>playerIndex!==index);
+      const valuable=rewards.filter(reward=>!reward.collected&&reward.value>=15);
+      return opponents.reduce((total,player)=>{
+        const blocksRoute=valuable.some(reward=>distance(player,reward)===distance(player,position)+distance(position,reward));
+        return total+(blocksRoute?8:0)+(distance(player,position)===1?5:0);
+      },0);
+    }
+
+    async function confirmMove() {
+      const human=localHuman();
+      if (!chosenMove || human.ready || !humanMayAct() || activePieceAnimations>0) return;
+      if (onlineEnabled()) {
+        stopTurnTimer();
+        clearTargetHighlights();
+        try {
+          const action=actionMode==="move"
+            ? {type:"move",target:{row:chosenMove.y,column:chosenMove.x}}
+            : ["jump","trap","weapon"].includes(actionMode)
+              ? {
+                  type:"ability",
+                  abilityId:actionMode==="jump"?"jump":actionMode==="trap"?"place-trap":"shoot",
+                  target:{
+                    tileId:GameState.tileId({row:chosenMove.y,column:chosenMove.x}),
+                    targetPlayerId:human.weaponTargetId,
+                    obstacleId:human.weaponObstacleId
+                  }
+                }
+              : ["teleport","ladder","obstacle"].includes(actionMode)
+                ? {type:"item",itemType:actionMode,target:{row:chosenMove.y,column:chosenMove.x}}
+              : actionMode==="item-shield"
+                ? {type:"item",itemType:"shield"}
+              : null;
+          if (!action) throw new Error("Tato speciální akce zatím není v online režimu podporována.");
+          await OnlineGame.submitAction(action);
+        } catch (error) {
+          onlineError(error);
+          markPossibleMoves();
+          startTurnTimer();
+        }
+        return;
+      }
+      stopTurnTimer();
+      human.ready=true;
+      clearTargetHighlights();
+      refreshGamePanel();
+      resolveActiveTurn();
+    }
+
+    function startTurnTimer() {
+      stopTurnTimer();
+      const human=localHuman();
+      const timer=byId("turnTimer");
+      if (!timer) return;
+      timer.classList.add("hidden");
+      timer.classList.remove("warning");
+      if (!humanMayAct() || !human || human.ready) return;
+      turnDeadline=Date.now()+8000;
+      timer.classList.remove("hidden");
+      updateTurnTimer();
+      turnTimerId=setInterval(updateTurnTimer,250);
+    }
+
+    function stopTurnTimer() {
+      if (turnTimerId) clearInterval(turnTimerId);
+      turnTimerId=null;
+      const timer=byId("turnTimer");
+      if (timer) timer.classList.add("hidden");
+    }
+
+    function updateTurnTimer() {
+      const timer=byId("turnTimer");
+      if (!timer) return;
+      const remaining=Math.max(0,Math.ceil((turnDeadline-Date.now())/1000));
+      timer.innerHTML=`<span>Čas na tah</span><strong>${remaining} s</strong>`;
+      timer.classList.toggle("warning",remaining<=3);
+      if (remaining<=0) autoPassHumanTurn();
+    }
+
+    async function autoPassHumanTurn() {
+      stopTurnTimer();
+      const human=localHuman();
+      if (!human || !humanMayAct() || human.ready) return;
+      if (onlineEnabled()) {
+        clearTargetHighlights();
+        try { await OnlineGame.submitAction({type:"wait"}); }
+        catch (error) { onlineError(error); }
+        return;
+      }
+      human.action="wait";
+      human.move={x:human.x,y:human.y};
+      if (human.skipRounds>0) {
+        human.action="skip";
+        human.skipRounds--;
+        human.stats.missedRounds++;
+      }
+      chosenMove=human.move;
+      actionMode="move";
+      human.itemIndex=undefined;
+      human.ready=true;
+      clearTargetHighlights();
+      showEffect(human,"ČAS VYPRŠEL");
+      refreshGamePanel();
+      resolveActiveTurn();
+    }
+
+    async function resolveActiveTurn() {
+      if (!gameState || gameState.isResolvingTurn || activePieceAnimations>0) return;
+      const index=activePlayerIndex();
+      let player=activePlayer();
+      if (!player) return showInitializationError("Nelze určit hráče na tahu.");
+      stopTurnTimer();
+      gameState.obstacles=obstacles;
+      gameState.isResolvingTurn=true;
+      setGamePhase("resolving");
+      clearTargetHighlights();
+      refreshGamePanel();
+
+      if (player.action==="move") {
+        const result=GameState.applyMove({...gameState,phase:"planning",isResolvingTurn:false},player.id,{
+          row:player.move?.y,
+          column:player.move?.x
+        });
+        if (!result.ok) {
+          gameState.isResolvingTurn=false;
+          setGamePhase("planning");
+          player.ready=false;
+          toast(result.error);
+          markPossibleMoves();
+          refreshGamePanel();
+          if (!player.bot) startTurnTimer();
+          return;
+        }
+        const piece=document.querySelector(`[data-player="${index}"]`);
+        piece?.classList.add("moving","active");
+        gameState=result.state;
+        gamePlayers=gameState.players;
+        player=gamePlayers[index];
+        setGamePhase("resolving");
+        setBoardPosition(piece,player.position.column,player.position.row);
+        logRoundEvent(player,`se přesunul na pole ${player.position.column+1}:${player.position.row+1}`);
+        await pause(460);
+        piece?.classList.remove("moving","active");
+      } else {
+        await resolveSequentialAction(player,index);
+      }
+
+      await resolveTraps();
+      await collectItems();
+      await collectRewards(false);
+      await finishActiveTurn();
+    }
+
+    async function resolveSequentialAction(player,index) {
+      if (player.action==="skip"||player.action==="wait") {
+        showEffect(player,player.action==="skip"?"VYNECHÁVÁ TAH":"ČEKÁ");
+        logRoundEvent(player,player.action==="skip"?"vynechal tah":"neprovedl žádnou akci");
+        await pause(380);
+        return;
+      }
+      if (player.action==="shield") {
+        player.pendingShield=false;
+        player.shieldActive=true;
+        player.shieldUntilRound=currentRound+2;
+        player.skipRounds=0;
+        showEffect(player,"ŠTÍT AKTIVNÍ");
+        logRoundEvent(player,"aktivoval štít");
+        await pause(420);
+        return;
+      }
+      if (["weapon","trap","jump"].includes(player.action)) {
+        await applyRoleAbilityAndAnimate(player,index);
+        return;
+      }
+      if (player.action==="teleport") {
+        if (!consumeInventoryItem(player,"teleport")) return;
+        player.stats.itemsUsed++;
+        await animateItemTeleport(player,index,player.move);
+        return;
+      }
+      if (player.action==="ladder") {
+        if (!consumeInventoryItem(player,"ladder")) return;
+        player.stats.itemsUsed++;
+        await animateLadder(player,index,player.move);
+        return;
+      }
+      if (player.action==="obstacle") {
+        if (canPlaceObstacle(player.move)&&consumeInventoryItem(player,"obstacle")) {
+          obstacles.push({id:Date.now()+index,x:player.move.x,y:player.move.y,owner:index,placedRound:currentRound,expiresRound:Infinity,expired:false});
+          gameState.obstacles=obstacles;
+          renderObstacles();
+          showEffect(player,"PŘEKÁŽKA POSTAVENA");
+        }
+        await pause(420);
+        return;
+      }
+    }
+
+    async function applyRoleAbilityAndAnimate(player,index) {
+      const abilityId=player.action==="jump"?"jump":player.action==="trap"?"place-trap":"shoot";
+      const targetInput={
+        tileId:GameState.tileId({row:player.move?.y,column:player.move?.x}),
+        targetPlayerId:player.weaponTargetId||gamePlayers[player.weaponTargetIndex]?.id,
+        obstacleId:player.weaponObstacleId
+      };
+      const previousPlayers=gamePlayers;
+      const previousActor=previousPlayers[index];
+      const previousTarget=targetInput.targetPlayerId?previousPlayers.find(candidate=>candidate.id===targetInput.targetPlayerId):null;
+      const result=GameState.applyAbility({
+        ...gameState,players:gamePlayers,traps,obstacles,phase:"planning",isResolvingTurn:false,round:currentRound
+      },player.id,abilityId,targetInput);
+      if (!result.ok) {
+        showEffect(player,"NEPLATNÝ CÍL SCHOPNOSTI");
+        logRoundEvent(player,`schopnost selhala: ${result.error}`);
+        await pause(450);
+        return;
+      }
+
+      let beam=null;
+      if (["shoot-player","shot-blocked"].includes(result.effect.type)&&previousTarget) {
+        const dx=previousTarget.y===previousActor.y?Math.sign(previousTarget.x-previousActor.x):0;
+        const dy=previousTarget.x===previousActor.x?Math.sign(previousTarget.y-previousActor.y):0;
+        beam=await showSlowBullet(previousActor,index,previousTarget,previousPlayers.indexOf(previousTarget),dx,dy);
+      }
+
+      gameState=result.state;
+      gamePlayers=gameState.players;
+      traps=gameState.traps;
+      obstacles=gameState.obstacles;
+      const actor=gamePlayers[index];
+
+      if (result.effect.type==="jump") {
+        const piece=document.querySelector(`[data-player="${index}"]`);
+        piece?.classList.add("moving","teleporting","active");
+        setBoardPosition(piece,actor.position.column,actor.position.row);
+        showEffect(actor,"SKOK");
+        logRoundEvent(actor,`skočil na pole ${actor.position.column+1}:${actor.position.row+1}`);
+        await pause(700);
+        piece?.classList.remove("moving","teleporting","active");
+      }
+      if (result.effect.type==="place-trap") {
+        renderTraps();
+        showEffect(actor,"PAST POLOŽENA");
+        logRoundEvent(actor,`položil past na pole ${result.effect.trap.x+1}:${result.effect.trap.y+1}`);
+        await pause(420);
+      }
+      if (result.effect.type==="destroy-obstacle") {
+        const element=document.querySelector(`[data-obstacle="${result.effect.obstacleId}"]`);
+        element?.classList.add("removing");
+        showEffect(actor,"PŘEKÁŽKA ZNIČENA");
+        logRoundEvent(actor,"výstřelem zničil překážku");
+        await pause(620);
+        renderObstacles();
+      }
+      if (result.effect.type==="shot-blocked") {
+        const target=gamePlayers[result.effect.targetIndex];
+        const targetPiece=document.querySelector(`[data-player="${result.effect.targetIndex}"]`);
+        targetPiece?.classList.add("shield-block");
+        showEffect(target,"ŠTÍT ZABLOKOVAL ZÁSAH");
+        logRoundEvent(target,`štít zablokoval výstřel hráče ${actor.name}`);
+        await pause(600);
+        targetPiece?.classList.remove("shield-block");
+      }
+      if (result.effect.type==="shoot-player") {
+        const target=gamePlayers[result.effect.targetIndex];
+        const targetPiece=document.querySelector(`[data-player="${result.effect.targetIndex}"]`);
+        targetPiece?.classList.add("moving","active");
+        setBoardPosition(targetPiece,target.position.column,target.position.row);
+        showEffect(actor,"+15 BODŮ ZA ZÁSAH");
+        showEffect(target,"ODSUN · PŘÍŠTÍ TAH VYNECHÁ");
+        logRoundEvent(actor,`zasáhl hráče ${target.name} a získal 15 bodů`);
+        logRoundEvent(target,`byl odsunut na pole ${target.position.column+1}:${target.position.row+1}`);
+        await pause(720);
+        targetPiece?.classList.remove("moving","active");
+      }
+      beam?.remove();
+      refreshGamePanel();
+    }
+
+    async function finishActiveTurn() {
+      const finishedRound=currentRound;
+      gameState.players=gamePlayers;
+      gameState.obstacles=obstacles;
+      const completion=GameState.completeTurn(gameState);
+      if (!completion.ok) return showInitializationError(completion.error);
+      gameState=completion.state;
+      gamePlayers=gameState.players;
+      setGamePhase("planning");
+      setGameRound(gameState.round);
+      chosenMove=null;
+      actionMode="move";
+      if (completion.completedRound) {
+        renderRoundRecap();
+        await processTimedObjects(gameState.round);
+        if (finishedRound>=12||rewards.every(reward=>reward.collected)) {
+          setSetupPhase("finished");
+          setGamePhase("finished");
+          renderFinalResults();
+          byId("gameOver").classList.remove("hidden");
+          return;
+        }
+        roundEvents=[];
+        await beginRound();
+        return;
+      }
+      await startActiveTurn();
+    }
+
+    function useItem(index) {
+      const human=localHuman();
+      if (human.ready || !humanMayAct()) return;
+      const type=human.inventory[index];
+      if (onlineEnabled()&&type==="shield") {
+        actionMode="item-shield";
+        human.itemIndex=index;
+        chosenMove={x:human.x,y:human.y};
+        confirmMove();
+        return;
+      }
+      if (!type) return;
+      if (human.skipRounds>0 && type!=="shield") return;
+      if (type==="shield") {
+        human.inventory.splice(index,1);
+        human.stats.itemsUsed++;
+        human.stats.specialActions++;
+        human.pendingShield=true;
+        human.action="shield";
+        human.move={x:human.x,y:human.y};
+        chosenMove=human.move;
+        actionMode="shield";
+        refreshGamePanel();
+        confirmMove();
+        return;
+      }
+      if (type==="teleport" || type==="ladder" || type==="obstacle") {
+        if (actionMode===type && human.itemIndex===index) {
+          actionMode="move";
+          human.action="move";
+          human.itemIndex=undefined;
+          human.move=null;
+          chosenMove=null;
+          markPossibleMoves();
+          refreshGamePanel();
+          return;
+        }
+        actionMode=type;
+        human.action=type;
+        human.itemIndex=index;
+        chosenMove=null;
+        markPossibleMoves();
+        refreshGamePanel();
+        return;
+      }
+      human.inventory.splice(index,1);
+      human.stats.itemsUsed++;
+      human.stats.specialActions++;
+      human.action=`item-${type}`;
+      human.move={x:human.x,y:human.y};
+      chosenMove=human.move;
+      actionMode=`item-${type}`;
+      refreshGamePanel();
+      confirmMove();
+    }
+
+    function toggleTrapPower() {
+      const human=humanPlayerFromState();
+      if (!human) return;
+      if (human.character!=="hunter" || human.ready || !humanMayAct() || human.skipRounds>0) return;
+      if (interactionMode.type==="selecting-trap-target") return cancelAbilitySelection();
+      actionMode=actionMode==="trap"?"move":"trap";
+      human.action=actionMode;
+      human.itemIndex=undefined;
+      human.move=null;
+      chosenMove=null;
+      markPossibleMoves();
+      refreshGamePanel();
+    }
+
+    function toggleCowboyPower() {
+      const human=humanPlayerFromState();
+      if (!human) return;
+      if (human.character!=="cowboy"||human.ready||!humanMayAct()||human.skipRounds>0) return;
+      actionMode=actionMode==="weapon"?"move":"weapon";
+      human.action=actionMode;
+      human.move=null; chosenMove=null;
+      markPossibleMoves(); refreshGamePanel();
+    }
+
+    function toggleJumperPower() {
+      const human=humanPlayerFromState();
+      if (!human) return;
+      if (human.character!=="jumper"||human.ready||!humanMayAct()||human.skipRounds>0) return;
+      if (interactionMode.type==="selecting-jump-target") return cancelAbilitySelection();
+      actionMode=actionMode==="jump"?"move":"jump";
+      human.action=actionMode;
+      human.move=null; chosenMove=null;
+      markPossibleMoves(); refreshGamePanel();
+    }
+
+    function consumeInventoryItem(player,type) {
+      let index=player.itemIndex;
+      if (index===undefined || player.inventory[index]!==type) index=player.inventory.indexOf(type);
+      if (index<0) return false;
+      player.inventory.splice(index,1);
+      player.itemIndex=undefined;
+      return true;
+    }
+
+    function teleportTargets(player) {
+      const result=[];
+      for(let dx=-9;dx<=9;dx++) for(let dy=-9;dy<=9;dy++) {
+        const x=player.x+dx,y=player.y+dy;
+        if(Math.abs(dx)+Math.abs(dy)>0 && x>=0&&x<10&&y>=0&&y<10 &&
+          !obstacles.some(o=>!o.expired&&o.x===x&&o.y===y)) result.push({x,y});
+      }
+      return result;
+    }
+
+    function ladderTargets(player) {
+      const targets=[];
+      for (let direction=0;direction<4;direction++) {
+        let current={x:player.x,y:player.y};
+        for (let distance=1;distance<=3;distance++) {
+          current=stepInDirection(current,direction);
+          if (current.x<0||current.x>=10||current.y<0||current.y>=10) break;
+          if (obstacles.some(o=>!o.expired&&o.x===current.x&&o.y===current.y)) break;
+          targets.push({...current});
+        }
+      }
+      return targets
+        .filter(({x,y})=>x>=0&&x<10&&y>=0&&y<10)
+        .filter(target=>!obstacles.some(o=>!o.expired&&o.x===target.x&&o.y===target.y));
+    }
+
+    function trapTargets(player) {
+      return adjacentTiles(player)
+        .filter(({x,y})=>x>=0&&x<10&&y>=0&&y<10)
+        .filter(({x,y})=>!obstacles.some(o=>!o.expired&&o.x===x&&o.y===y));
+    }
+
+    const pause = ms => new Promise(resolve => setTimeout(resolve,ms));
+
+    function logRoundEvent(player,text) {
+      roundEvents.push({name:player.name,color:player.color,text});
+    }
+
+    function isHumanRelevant(...indices) {
+      return indices.includes(0);
+    }
+
+    function isProtectedFrom(player,attackerIndex) {
+      return !!player?.recoveryProtection && (player.recoveryProtection[attackerIndex]||0)>=currentRound;
+    }
+
+    function protectRecovery(player,attackerIndex,blockedRounds,reason) {
+      player.recoveryProtection=player.recoveryProtection||{};
+      player.recoveryProtection[attackerIndex]=Math.max(player.recoveryProtection[attackerIndex]||0,currentRound+blockedRounds+1);
+      player.disabledReason=reason;
+      player.disabledBy=attackerIndex;
+    }
+
+    async function showActionCutscene(kind,actor,target,caption) {
+      if (!actor || !target) return;
+      const isTrap=kind==="trap";
+      const overlay=document.createElement("div");
+      overlay.className=`action-cutscene ${isTrap?"trap-scene":"shot-scene"}`;
+      overlay.innerHTML=`
+        <div class="cutscene-panel">
+          <div class="cut-title">${isTrap?"Past sklapla!":"Zásah!"}</div>
+          <div class="cut-character shooter" style="--actor:${actor.color}">
+            <div class="cut-avatar"><span>${roleIcon(actor.role)}</span></div>
+            <div class="cut-name">${safe(actor.name)}</div>
+          </div>
+          <div class="cut-middle">
+            ${isTrap?`<div class="cut-trap">🪤</div>`:`<div class="cut-flash"></div><div class="cut-bullet"></div>`}
+          </div>
+          <div class="cut-character victim" style="--actor:${target.color}">
+            <div class="cut-avatar hit"><span>${roleIcon(target.role)}</span></div>
+            <div class="cut-name">${safe(target.name)}</div>
+          </div>
+          <div class="cut-caption">${safe(caption)}</div>
+        </div>`;
+      document.body.appendChild(overlay);
+      await pause(isTrap?1550:1650);
+      overlay.remove();
+    }
+
+    async function animateTrapSnap(trap,ownerIndex,player,index,caughtDirectly) {
+      const relevant=isHumanRelevant(ownerIndex,index);
+      const victimPiece=document.querySelector(`[data-player="${index}"]`);
+      const element=document.querySelector(`[data-trap="${trap.id}"]`);
+      if (relevant) {
+        await showActionCutscene("trap",gamePlayers[ownerIndex],player,caughtDirectly
+          ? "Lovec položil past přímo pod postavu. Past se okamžitě sklapla."
+          : "Postava došla na skrytou past. Čelisti se zavřely kolem nohy.");
+        byId("phaseMessage").textContent=caughtDirectly
+          ? `${gamePlayers[ownerIndex]?.name||"Lovec"} položil past přímo pod hráče ${player.name}`
+          : `${player.name} šlápnul do lovecké pasti`;
+        victimPiece?.classList.add("trap-step");
+        await pause(380);
+      }
+      element?.classList.remove("hidden-trap");
+      element?.classList.add("triggered","clamping");
+      victimPiece?.classList.remove("trap-step");
+      victimPiece?.classList.add("trap-caught");
+      await pause(relevant?1050:760);
+      victimPiece?.classList.remove("trap-caught");
+    }
+
+    async function showSlowBullet(player,index,target,targetIndex,dx,dy) {
+      const shooterPiece=document.querySelector(`[data-player="${index}"]`);
+      const targetPiece=document.querySelector(`[data-player="${targetIndex}"]`);
+      const beam=document.createElement("div");
+      const relevant=isHumanRelevant(index,targetIndex);
+      if (relevant) await showActionCutscene("shot",player,target,"Kovboj zamířil. Kulka letí zpomaleně a zásah odhodí postavu k okraji.");
+      shooterPiece?.classList.add("aiming","active");
+      byId("phaseMessage").textContent=`${player.name} míří na ${target.name}`;
+      await pause(relevant?420:180);
+      beam.className=`weapon-beam ${relevant?"slow-bullet":""}`;
+      setBoardPosition(beam,player.x,player.y);
+      const sourceCenter=BoardGeometry.center(player.y,player.x);
+      const targetCenter=BoardGeometry.center(target.y,target.x);
+      const sourceSize=BoardGeometry.cellSize(player.y,player.x);
+      const geometryDx=(targetCenter.x-sourceCenter.x)/sourceSize;
+      const geometryDy=(targetCenter.y-sourceCenter.y)/sourceSize;
+      beam.style.setProperty("--dx",geometryDx);
+      beam.style.setProperty("--dy",geometryDy);
+      beam.style.setProperty("--tx",geometryDx);
+      beam.style.setProperty("--ty",geometryDy);
+      beam.textContent=relevant?"●":dx>0?"➤":dx<0?"⬅":dy>0?"⬇":"⬆";
+      byId("scoreEffects").appendChild(beam);
+      await pause(relevant?1300:350);
+      targetPiece?.classList.add("bullet-hit");
+      await pause(relevant?360:120);
+      targetPiece?.classList.remove("bullet-hit");
+      shooterPiece?.classList.remove("aiming","active");
+      return beam;
+    }
+
+    function renderRoundRecap() {
+      byId("roundRecap").innerHTML=roundEvents.length
+        ? roundEvents.map(event=>`<div class="recap-event" style="--event-color:${event.color}"><strong>${safe(event.name)}</strong> — ${safe(event.text)}</div>`).join("")
+        : `<span class="waiting-mark">V kole se nic nestalo.</span>`;
+      const board=byId("boardWrap");
+      board.classList.remove("round-finish");
+      void board.offsetWidth;
+      board.classList.add("round-finish");
+    }
+
+    function renderFinalResults() {
+      const ranking=[...gamePlayers].sort((a,b)=>b.score-a.score||b.stats.rewards-a.stats.rewards);
+      const winner=ranking[0];
+      const biggest=[...gamePlayers].sort((a,b)=>b.stats.largestReward-a.stats.largestReward)[0];
+      const strategist=[...gamePlayers].sort((a,b)=>
+        (b.stats.specialActions+b.stats.itemsUsed*2+b.stats.trapsTriggered*2)-
+        (a.stats.specialActions+a.stats.itemsUsed*2+a.stats.trapsTriggered*2)
+      )[0];
+      const unlucky=[...gamePlayers].sort((a,b)=>b.stats.missedRounds-a.stats.missedRounds||a.score-b.score)[0];
+
+      byId("winnerStage").innerHTML=`
+        <div class="winner-crown">♛</div>
+        <div class="winner-orb" style="--winner:${winner.color}">${safe(winner.initial)}</div>
+        <h3>${safe(winner.name)}</h3>
+        <strong style="color:var(--accent);font-size:1.35rem">${formatScore(winner.score)} bodů</strong>`;
+      byId("finalAwards").innerHTML=[
+        ["🏆","Vítěz hry",winner.name,`${formatScore(winner.score)} bodů`],
+        ["💎","Největší odměna",biggest.name,`${formatScore(biggest.stats.largestReward)} bodů`],
+        ["🧠","Nejvíce strategický",strategist.name,`${strategist.stats.specialActions} speciálních akcí`],
+        ["☂","Největší smolař",unlucky.name,`${unlucky.stats.missedRounds} vynechaných kol`]
+      ].map(([icon,title,name,detail])=>`
+        <div class="award-card"><span>${icon}</span><small>${title}</small><strong>${safe(name)}</strong><small>${detail}</small></div>
+      `).join("");
+      byId("finalRanking").innerHTML=`
+        <div class="rank-row rank-head"><span>#</span><span>Hráč</span><span>Body</span><span>Odměny</span><span>Předměty</span><span>Pasti</span><span>Vynecháno</span></div>
+        ${ranking.map((player,index)=>`
+          <div class="rank-row ${index===0?"winner":""}">
+            <span class="rank-number">${index+1}.</span>
+            <span class="rank-name"><span class="dot" style="--player:${player.color}"></span>${safe(player.name)}</span>
+            <span class="rank-stat"><b>${formatScore(player.score)}</b>bodů</span>
+            <span class="rank-stat"><b>${player.stats.rewards}</b>odměn</span>
+            <span class="rank-stat"><b>${player.stats.itemsUsed}</b>použito</span>
+            <span class="rank-stat"><b>${player.stats.trapsTriggered}</b>aktivací</span>
+            <span class="rank-stat"><b>${player.stats.missedRounds}</b>kol</span>
+          </div>`).join("")}`;
+    }
+
+    async function processTimedObjects(nextRound) {
+      const expiring=obstacles.filter(obstacle=>!obstacle.expired&&obstacle.expiresRound<=nextRound);
+      const opening=rewards.filter(reward=>!reward.collected&&!reward.unlocked&&reward.unlockRound<=nextRound);
+      for (const obstacle of expiring) {
+        const element=document.querySelector(`[data-obstacle="${obstacle.id}"]`);
+        element?.classList.add("removing");
+        byId("phaseMessage").textContent="Překážka po 3 kolech mizí";
+        obstacle.expired=true;
+        await pause(420);
+        element?.remove();
+      }
+      for (const reward of opening) {
+        reward.unlocked=true;
+        const element=document.querySelector(`[data-reward="${reward.id}"]`);
+        element?.classList.remove("locked");
+        element?.classList.add("unlocking");
+        byId("phaseMessage").textContent=`Otevírá se odměna za ${reward.value} bodů`;
+        await pause(520);
+      }
+      renderObstacles();
+      renderRewards();
+      if (!expiring.length&&!opening.length) {
+        byId("phaseMessage").textContent="Žádné časované změny";
+        await pause(220);
+      }
+    }
+
+    async function animateItemTeleport(player,index,target) {
+      const piece=document.querySelector(`[data-player="${index}"]`);
+      piece.classList.add("teleporting");
+      byId("phaseMessage").textContent=`${player.name} používá teleport`;
+      await pause(450);
+      GameState.setPlayerPosition(player,{column:target.x,row:target.y});
+      setBoardPosition(piece,player.x,player.y);
+      await pause(800);
+      piece.classList.remove("teleporting");
+      showEffect(player,"TELEPORT");
+      refreshGamePanel();
+    }
+
+    async function animateLadder(player,index,target) {
+      const dx=Math.sign(target.x-player.x),dy=Math.sign(target.y-player.y);
+      addMapEffect("bridge-effect",player.x+dx,player.y+dy,"🪜");
+      byId("phaseMessage").textContent=`${player.name} postupuje o 3 pole pomocí žebříku`;
+      const piece=document.querySelector(`[data-player="${index}"]`);
+      piece.classList.add("moving","active");
+      GameState.setPlayerPosition(player,{column:target.x,row:target.y});
+      setBoardPosition(piece,player.x,player.y);
+      await pause(900);
+      piece.classList.remove("moving","active");
+      refreshGamePanel();
+    }
+
+    function addMapEffect(className,x,y,text) {
+      const effect=document.createElement("div");
+      effect.className=className; setBoardPosition(effect,x,y); effect.textContent=text;
+      byId("scoreEffects").appendChild(effect);
+      setTimeout(()=>effect.remove(),2100);
+    }
+
+    async function collectItems() {
+      for(const item of items.filter(item=>!item.collected)) {
+        const collectors=gamePlayers.filter(player=>
+          player.x===item.x&&player.y===item.y&&
+          !(player.role==="jumper"&&item.type==="shield")&&
+          player.inventory.length<8
+        );
+        if(!collectors.length) continue;
+        const player=collectors[0];
+        const element=document.querySelector(`[data-item="${item.id}"]`);
+        element?.classList.add("collecting");
+        player.inventory.push(item.type);
+        item.collected=true;
+        byId("phaseMessage").textContent=`${player.name} získává předmět: ${itemInfo[item.type].name}`;
+        showEffect(player,`${itemInfo[item.type].icon} ${itemInfo[item.type].name} SEBRÁNA · ${player.inventory.length}/8`);
+        await pause(720);
+        element?.remove();
+        refreshGamePanel();
+      }
+    }
+
+    async function resolveTraps() {
+      for (const trap of traps.filter(item => !item.used && (!item.expiresRound||currentRound<item.expiresRound))) {
+        const victims=gamePlayers
+          .map((player,index) => ({player,index}))
+          .filter(({player,index}) => index!==trap.owner && player.x===trap.x && player.y===trap.y);
+        if (!victims.length) continue;
+        trap.revealed=true;
+        const element=document.querySelector(`[data-trap="${trap.id}"]`);
+        element?.classList.remove("hidden-trap");
+        element?.classList.add("triggered");
+        const {player,index}=victims[0];
+        const owner=gamePlayers[trap.owner];
+        if (player.role==="hunter") {
+          byId("phaseMessage").textContent=`Lovec ${player.name} past bezpečně obešel`;
+          showEffect(player,"LOVEC JE IMUNNÍ VŮČI PASTEM");
+          logRoundEvent(player,"bezpečně obešel past díky roli Lovce");
+          await pause(650);
+          continue;
+        }
+        if (isProtectedFrom(player,trap.owner)) {
+          byId("phaseMessage").textContent=`${player.name} se právě vrátil do hry a stejný hráč ho nemůže hned znovu znevýhodnit`;
+          showEffect(player,"OCHRANA PO NÁVRATU");
+          logRoundEvent(player,`odolal opakovanému znevýhodnění od hráče ${owner?.name||"soupeř"}`);
+          trap.used=true;
+          await pause(850);
+          element?.remove();
+          refreshGamePanel();
+          continue;
+        }
+        if (player.shieldActive || player.pendingShield) {
+          const piece=document.querySelector(`[data-player="${index}"]`);
+          player.pendingShield=false;
+          player.action=player.action==="shield"?"shield-spent":player.action;
+          piece?.classList.add("shield-block");
+          byId("phaseMessage").textContent=`Štít hráče ${player.name} zablokoval loveckou past`;
+          showEffect(player,"PAST ZABLOKOVÁNA ŠTÍTEM");
+          logRoundEvent(player,"štít zablokoval past");
+          trap.used=true;
+          await pause(900);
+          piece?.classList.remove("shielded","shield-block");
+          element?.remove();
+          refreshGamePanel();
+          continue;
+        }
+        if (owner) {
+          owner.stats.trapsTriggered++;
+          if (owner.role==="hunter") {
+            owner.score+=15;
+            showEffect(owner,"+15 BODŮ ZA PAST");
+            logRoundEvent(owner,`chytil hráče ${player.name} a získal 15 bodů`);
+          }
+        }
+        const caughtDirectly=trap.directVictimIndex===index;
+        await animateTrapSnap(trap,trap.owner,player,index,caughtDirectly);
+        const blockedRounds=caughtDirectly?1:2;
+        byId("phaseMessage").textContent=`${player.name} ${blockedRounds===1?"vynechá 1 kolo":"vynechá 2 kola"}`;
+        showEffect(player,`VYNECHÁ ${blockedRounds} ${blockedRounds===1?"KOLO":"KOLA"}`);
+        logRoundEvent(player,caughtDirectly
+          ?"Lovec položil past přímo pod něj — vynechá 1 kolo"
+          :`vstoupil do pasti — vynechá ${blockedRounds} kola`);
+        await pause(850);
+        player.skipRounds=Math.max(player.skipRounds,blockedRounds);
+        protectRecovery(player,trap.owner,blockedRounds,"trap");
+        trap.used=true;
+        await pause(650);
+        element?.remove();
+      }
+    }
+
+    function showEffect(player,label) {
+      const effect=document.createElement("div");
+      effect.className="effect-pop";
+      setBoardPosition(effect,player.x,player.y);
+      effect.innerHTML=`<span>${safe(label)}</span>`;
+      byId("scoreEffects").appendChild(effect);
+      setTimeout(() => effect.remove(),1850);
+    }
+
+    function formatScore(score) {
+      return Number.isInteger(score) ? score : score.toFixed(1).replace(".",",");
+    }
+
+    async function collectRewards(deferScoreUpdate=false) {
+      const collected=rewards.filter(reward =>
+        !reward.collected && reward.unlocked && gamePlayers.some(player =>
+          player.x===reward.x && player.y===reward.y
+        )
+      );
+      for (const reward of collected) {
+        const winners=gamePlayers.filter(player=>player.x===reward.x && player.y===reward.y);
+        const share=reward.value/winners.length;
+        const rewardElement=document.querySelector(`[data-reward="${reward.id}"]`);
+        rewardElement?.classList.add("collecting");
+        byId("phaseMessage").textContent=winners.length>1
+          ? `${reward.value} bodů se dělí mezi ${winners.length} hráče`
+          : `${winners[0].name} získává ${reward.value} bodů`;
+        winners.forEach((player,index) => {
+          player.score+=share;
+          player.stats.rewards++;
+          player.stats.largestReward=Math.max(player.stats.largestReward,share);
+          logRoundEvent(player,`sebral odměnu a získal ${formatScore(share)} bodů${winners.length>1?" po rozdělení":""}`);
+          const effect=document.createElement("div");
+          effect.className="score-pop";
+          setBoardPosition(effect,player.x,player.y);
+          effect.style.setProperty("--offset",`${(index-(winners.length-1)/2)*38}px`);
+          effect.innerHTML=`<span>+${formatScore(share)} b.${winners.length>1?" · 1/"+winners.length:""}</span>`;
+          byId("scoreEffects").appendChild(effect);
+          setTimeout(() => effect.remove(),1300);
+        });
+        await pause(680);
+        reward.collected=true;
+        rewardElement?.remove();
+        if (!deferScoreUpdate) refreshGamePanel();
+        await pause(650);
+      }
+    }
+
+    function toast(message) {
+      byId("toast").textContent=message;
+      byId("toast").classList.add("show");
+      setTimeout(() => byId("toast").classList.remove("show"),1600);
+    }
+
+    document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click",() => {
+      document.querySelectorAll(".tab").forEach(item => item.classList.toggle("active",item===tab));
+      byId("createPanel").classList.toggle("hidden",tab.dataset.tab!=="create");
+      byId("joinPanel").classList.toggle("hidden",tab.dataset.tab!=="join");
+    }));
+    document.addEventListener("keydown",event=>{
+      if (event.key==="Escape"&&cancelAbilitySelection()) event.preventDefault();
+    });
+    byId("botCount").addEventListener("change",refreshLobby);
+    byId("hostName").addEventListener("input",refreshLobby);
+    byId("startGame").addEventListener("click",launchGame);
+    document.querySelectorAll("[data-role-choice]").forEach(card=>card.addEventListener("click",()=>selectRoleCard(card.dataset.roleChoice)));
+    byId("backToLobbyFromSelection").addEventListener("click",returnToLobby);
+    byId("confirmRole").addEventListener("click",prepareGame);
+    byId("changePreparedCharacters").addEventListener("click",returnToCharacterSelection);
+    byId("beginPreparedGame").addEventListener("click",startPreparedGame);
+    byId("boardWrap").addEventListener("click",selectCell);
+    byId("confirmMove").addEventListener("click",confirmMove);
+    byId("trapPower").addEventListener("click",toggleTrapPower);
+    byId("cowboyPower").addEventListener("click",toggleCowboyPower);
+    byId("jumperPower").addEventListener("click",toggleJumperPower);
+    byId("newGame").addEventListener("click",returnToLobby);
+    byId("retryInitialization").addEventListener("click",() => {
+      clearInitializationError();
+      prepareGame();
+    });
+    byId("returnToLobby").addEventListener("click",returnToLobby);
+    byId("joinButton").addEventListener("click",async() => {
+      if (onlineEnabled()) {
+        try {
+          byId("joinButton").disabled=true;
+          const code=(byId("joinCode").value.trim()||"").toUpperCase();
+          const detail=await OnlineGame.joinRoom(code,byId("joinName").value.trim());
+          history.replaceState(null,"",`/game/${detail.room.code}`);
+          syncOnlineGameState({...detail,localUserId:OnlineGame.userId});
+          showRoleSelection();
+        } catch (error) {
+          onlineError(error);
+        } finally {
+          byId("joinButton").disabled=false;
+        }
+        return;
+      }
+      byId("hostName").value=byId("joinName").value.trim()||"Nový hráč";
+      byId("roomCode").textContent=(byId("joinCode").value.trim()||"Q7MK").toUpperCase();
+      byId("botCount").value="3";
+      launchGame();
+    });
+    byId("copyCode").addEventListener("click",async() => {
+      try { await navigator.clipboard.writeText(byId("roomCode").textContent); toast("Kód zkopírován"); }
+      catch { toast(`Kód: ${byId("roomCode").textContent}`); }
+    });
+    byId("copyLink").addEventListener("click",async() => {
+      const link=byId("roomLink").value;
+      try { await navigator.clipboard.writeText(link); toast("Odkaz zkopírován"); }
+      catch { toast(link); }
+    });
+    if (onlineEnabled()) {
+      OnlineGame.onSnapshot(syncOnlineGameState);
+      OnlineGame.initializeFromLocation().then(result=>{
+        if (result?.needsNickname) {
+          document.querySelectorAll(".tab").forEach(tab=>tab.classList.toggle("active",tab.dataset.tab==="join"));
+          byId("createPanel").classList.add("hidden");
+          byId("joinPanel").classList.remove("hidden");
+          byId("joinCode").value=result.room.code;
+          byId("onlineStatus").textContent="Zadej přezdívku a připoj se do sdílené místnosti.";
+        } else if (result?.room) {
+          syncOnlineGameState({...result,localUserId:OnlineGame.userId});
+          if (result.room.phase==="lobby") showRoleSelection();
+        }
+      }).catch(onlineError);
+    } else {
+      byId("onlineStatus").textContent="Lokální demo. Pro veřejnou hru nastav Supabase proměnné prostředí.";
+    }
+    refreshLobby();
+  </script>
+</body>
+</html>
