@@ -123,3 +123,4 @@ Netlify může hostovat statický frontend, ale serverové funkce v tomto projek
 ## Omezení bez backendové konfigurace
 
 Pokud nejsou nastavené Supabase proměnné, aplikace zachová původní lokální demo. Veřejný multiplayer, sdílené URL, reconnect a realtime vyžadují dokončené kroky výše.
+Deployment refresh
